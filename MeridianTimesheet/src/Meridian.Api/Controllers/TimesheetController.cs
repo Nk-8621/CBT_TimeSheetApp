@@ -32,7 +32,7 @@ public class TimesheetController(ITimesheetService timesheetService, ICurrentUse
 	{
 		if (EnsureSelfOrAdmin(employeeCode) is IActionResult denied) return denied;
 		var created = await timesheetService.AddEntryAsync(employeeCode, weekStart, request, ct);
-		return CreatedAtAction(nameof(GetWeek), new { employeeCode, weekStart }, created);
+		return CreatedAtAction(nameof(GetWeek), new { employeeCode, weekStart = weekStart.ToString("yyyy-MM-dd") }, created);
 	}
 
 	[HttpPut("entries/{timeEntryId:int}")]
