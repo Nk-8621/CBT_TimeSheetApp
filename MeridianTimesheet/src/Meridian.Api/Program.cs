@@ -21,6 +21,7 @@ builder.Services.AddScoped<IWeekApprovalService, WeekApprovalService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<ITeamService, TeamService>();
 builder.Services.AddScoped<IReportsService, ReportsService>();
+builder.Services.AddScoped<IAccessControlService, AccessControlService>();
 
 builder.Services.AddInfrastructure(builder.Configuration);
 
