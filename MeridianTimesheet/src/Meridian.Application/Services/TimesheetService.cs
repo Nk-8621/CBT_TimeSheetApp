@@ -14,13 +14,13 @@ public class TimesheetService(
 	IDayTypeRepository dayTypeRepository,
 	IWeekRecordRepository weekRecordRepository,
 	IMasterDataRepository masterDataRepository,
-	ILeaveRepository leaveRepository) : ITimesheetService
+	IDayTypeResolutionService dayTypeResolutionService) : ITimesheetService
 {
 	public async Task<WeekSummaryDto> GetWeekAsync(string employeeCode, DateOnly weekStartDate, CancellationToken ct = default)
 	{
 		var employee = await RequireEmployeeAsync(employeeCode, ct);
 		var entries = await timeEntryRepository.GetForWeekAsync(employee.EmployeeId, weekStartDate, ct);
-		var dayTypeDtos = await ResolveDayTypesAsync(employee.EmployeeId, weekStartDate, ct);
+		var dayTypeDtos = await dayTypeResolutionService.ResolveWeekAsync(employee.EmployeeId, weekStartDate, ct);
 		var weekRecord = await weekRecordRepository.GetAsync(employee.EmployeeId, weekStartDate, ct);
 
 		var entryDtos = entries.Select(e => ToDto(e, employeeCode)).ToList();
@@ -199,28 +199,6 @@ public class TimesheetService(
 		var status = week?.Status ?? WeekStatus.Draft;
 		if (status is not (WeekStatus.Draft or WeekStatus.Rejected))
 			throw new WeekLockedException(employeeCode, weekStartDate, status.ToString());
-	}
-
-	private async Task<List<DayTypeDto>> ResolveDayTypesAsync(int employeeId, DateOnly weekStartDate, CancellationToken ct)
-	{
-		var days = WeekMath.WeekDays(weekStartDate);
-		var overrides = await dayTypeRepository.GetForWeekAsync(employeeId, weekStartDate, ct);
-		var overrideByDate = overrides.ToDictionary(o => o.EntryDate, o => o.DayType);
-		var leaveRecords = await leaveRepository.GetForEmployeeAsync(employeeId, days[0], days[^1], ct);
-		var leaveDates = leaveRecords.Select(l => l.LeaveDate).ToHashSet();
-
-		var result = new List<DayTypeDto>(7);
-		foreach (var date in days)
-		{
-			var holiday = await masterDataRepository.GetHolidayOnAsync(date, ct);
-			var isOnLeave = leaveDates.Contains(date);
-			overrideByDate.TryGetValue(date, out var overrideType);
-
-			var resolved = Common.DayTypeResolver.Resolve(date, holiday is not null, isOnLeave, overrideByDate.ContainsKey(date) ? overrideType : null);
-			var capacity = resolved is DayType.W or DayType.WFH ? WeekMath.StandardHoursPerDay : 0m;
-			result.Add(new DayTypeDto(date, resolved.ToString(), capacity));
-		}
-		return result;
 	}
 
 	private static TimeEntryDto ToDto(TimeEntry entry, string employeeCode) => new(

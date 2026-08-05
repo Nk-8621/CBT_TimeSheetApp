@@ -19,4 +19,10 @@ public interface IWeekApprovalService
     /// <summary>Weeks currently awaiting this approver's action (their Level 1 or
     /// Level 2 queue, depending on which the caller asks for).</summary>
     Task<IReadOnlyList<WeekRecordDto>> GetPendingForApproverAsync(string approverEmployeeCode, bool level2, CancellationToken ct = default);
+
+    /// <summary>The full-detail version of the queue above — flags, line-level
+    /// detail with every hierarchy name resolved, and the billable split —
+    /// everything the Approvals screen needs in one call. Sorted flagged
+    /// items first, matching the original wireframe.</summary>
+    Task<IReadOnlyList<ApprovalQueueItemDto>> GetApprovalQueueAsync(string approverEmployeeCode, bool level2, CancellationToken ct = default);
 }

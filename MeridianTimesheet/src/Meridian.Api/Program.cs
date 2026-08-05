@@ -16,12 +16,14 @@ var builder = WebApplication.CreateBuilder(args);
 // project can stay free of any dependency-injection package reference.)
 builder.Services.AddScoped<IEmployeeService, EmployeeService>();
 builder.Services.AddScoped<IMasterDataService, MasterDataService>();
+//builder.Services.AddScoped<IMasterDataAdminService, MasterDataAdminService>();
 builder.Services.AddScoped<ITimesheetService, TimesheetService>();
 builder.Services.AddScoped<IWeekApprovalService, WeekApprovalService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<ITeamService, TeamService>();
 builder.Services.AddScoped<IReportsService, ReportsService>();
 builder.Services.AddScoped<IAccessControlService, AccessControlService>();
+builder.Services.AddScoped<IDayTypeResolutionService, DayTypeResolutionService>();
 
 builder.Services.AddInfrastructure(builder.Configuration);
 

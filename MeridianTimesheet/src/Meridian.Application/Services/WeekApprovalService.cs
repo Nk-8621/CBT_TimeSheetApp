@@ -13,7 +13,9 @@ public class WeekApprovalService(
 	ITimeEntryRepository timeEntryRepository,
 	IDayTypeRepository dayTypeRepository,
 	IWeekRecordRepository weekRecordRepository,
-	IEmployeeService employeeService) : IWeekApprovalService
+	IEmployeeService employeeService,
+	IMasterDataRepository masterDataRepository,
+	IDayTypeResolutionService dayTypeResolutionService) : IWeekApprovalService
 {
 	public async Task<WeekValidationResult> ValidateForSubmissionAsync(string employeeCode, DateOnly weekStartDate, CancellationToken ct = default)
 	{
@@ -188,7 +190,80 @@ public class WeekApprovalService(
 		return result;
 	}
 
-	// ---- Shared helpers ----
+	public async Task<IReadOnlyList<ApprovalQueueItemDto>> GetApprovalQueueAsync(string approverEmployeeCode, bool level2, CancellationToken ct = default)
+	{
+		var status = level2 ? WeekStatus.PendingL2 : WeekStatus.PendingL1;
+		var weeks = await weekRecordRepository.GetByStatusAsync(status, ct);
+
+		// Fetch every reference table once — joining per-row would mean
+		// hundreds of round trips for a queue this size.
+		var deptById = (await masterDataRepository.GetDepartmentsAsync(ct)).ToDictionary(d => d.DepartmentId);
+		var accountById = (await masterDataRepository.GetAccountsAsync(ct)).ToDictionary(a => a.AccountId);
+		var projectById = (await masterDataRepository.GetProjectsAsync(ct)).ToDictionary(p => p.ProjectId);
+		var moduleById = (await masterDataRepository.GetModulesAsync(ct: ct)).ToDictionary(m => m.ModuleId);
+		var taskById = (await masterDataRepository.GetTasksAsync(ct: ct)).ToDictionary(t => t.TaskId);
+
+		var result = new List<ApprovalQueueItemDto>();
+		foreach (var week in weeks)
+		{
+			var employee = await employeeRepository.GetByIdAsync(week.EmployeeId, ct);
+			if (employee is null) continue;
+
+			var relevantApprover = level2
+				? (await DetermineApprovalRoutingAsync(employee.EmployeeCode, ct)).Level2Approver
+				: await employeeService.GetManagerAsync(employee.EmployeeCode, ct);
+			if (relevantApprover?.EmployeeCode != approverEmployeeCode) continue;
+
+			var entries = await timeEntryRepository.GetForWeekAsync(employee.EmployeeId, week.WeekStartDate, ct);
+			var dayTypeDtos = await dayTypeResolutionService.ResolveWeekAsync(employee.EmployeeId, week.WeekStartDate, ct);
+			var dayTypes = dayTypeDtos.Select(d => Enum.Parse<DayType>(d.DayType)).ToList();
+
+			var total = entries.Sum(e => e.TotalHours);
+			var billable = entries.Where(e => e.IsBillable).Sum(e => e.TotalHours);
+			var projectCount = entries.Select(e => e.ProjectId).Distinct().Count();
+
+			var flagLines = entries.Select(e => new ApprovalFlagsCalculator.FlagLine(
+				taskById.TryGetValue(e.TaskId, out var flagTask) ? flagTask.Name : $"Task #{e.TaskId}",
+				e.Note, e.HoursByDay, e.IsBillable
+			)).ToList();
+			var flags = ApprovalFlagsCalculator.Calculate(flagLines, dayTypes);
+
+			var lines = entries.Select(e =>
+			{
+				projectById.TryGetValue(e.ProjectId, out var project);
+				var account = project is not null && accountById.TryGetValue(project.AccountId, out var acc) ? acc : null;
+				var department = account is not null && deptById.TryGetValue(account.DepartmentId, out var dept) ? dept : null;
+				moduleById.TryGetValue(e.ModuleId, out var module);
+				taskById.TryGetValue(e.TaskId, out var task);
+
+				return new ApprovalQueueLineDto(
+					department?.Code ?? "—",
+					account?.Name ?? "—",
+					account?.AccountType.ToString() ?? "—",
+					project?.Name ?? "—",
+					project?.Code ?? "—",
+					module?.Name ?? "—",
+					task?.Name ?? $"Task #{e.TaskId}",
+					e.IsBillable,
+					e.HoursByDay,
+					e.Note
+				);
+			}).ToList();
+
+			result.Add(new ApprovalQueueItemDto(
+				employee.EmployeeCode, employee.FullName, employee.Designation,
+				deptById.TryGetValue(employee.DepartmentId, out var employeeDept) ? employeeDept.Name : "—",
+				week.WeekStartDate, week.SubmittedAt, week.Status.ToString(),
+				total, billable, total - billable, projectCount, entries.Count,
+				flags, lines, dayTypeDtos
+			));
+		}
+
+		// Flagged items first — matches the original wireframe's queue ordering.
+		return result.OrderByDescending(r => r.Flags.Count > 0).ThenBy(r => r.FullName).ToList();
+	}
+
+
 
 	private record ApprovalRouting(bool SkipLevel1, EmployeeDto? Level1Approver, EmployeeDto? Level2Approver);
 
