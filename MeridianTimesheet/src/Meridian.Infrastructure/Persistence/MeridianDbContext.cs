@@ -62,5 +62,6 @@ public class MeridianDbContext(DbContextOptions<MeridianDbContext> options) : Db
         modelBuilder.ApplyConfiguration(new ApprovalEventConfiguration());
 
         modelBuilder.ApplyConfiguration(new NotificationConfiguration());
-    }
+		modelBuilder.ApplyConfiguration(new OtpConfiguration());
+	}
 }
