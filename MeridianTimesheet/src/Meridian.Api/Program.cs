@@ -1,12 +1,22 @@
 using Meridian.Api.Auth;
 using Meridian.Api.Middleware;
+using Meridian.Application.Common;
+using Meridian.Application.Interfaces.Repositories;
 using Meridian.Application.Interfaces.Services;
 using Meridian.Application.Services;
 using Meridian.Infrastructure;
+using Meridian.Infrastructure.Repositories;
+using Meridian.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.IdentityModel.Tokens;
+
+
 // using Microsoft.AspNetCore.Authentication.JwtBearer;   // needed again once real Entra login is switched on
 // using Microsoft.Identity.Web;                          // needed again once real Entra login is switched on
 using Microsoft.OpenApi.Models;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,6 +24,9 @@ var builder = WebApplication.CreateBuilder(args);
 // (Application's own services are registered directly here — rather than
 // via an AddApplication() extension inside Meridian.Application — so that
 // project can stay free of any dependency-injection package reference.)
+
+builder.Services.Configure<OtpSettings>(builder.Configuration.GetSection("Otp"));
+builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
 builder.Services.AddScoped<IEmployeeService, EmployeeService>();
 builder.Services.AddScoped<IMasterDataService, MasterDataService>();
 //builder.Services.AddScoped<IMasterDataAdminService, MasterDataAdminService>();
@@ -24,6 +37,14 @@ builder.Services.AddScoped<ITeamService, TeamService>();
 builder.Services.AddScoped<IReportsService, ReportsService>();
 builder.Services.AddScoped<IAccessControlService, AccessControlService>();
 builder.Services.AddScoped<IDayTypeResolutionService, DayTypeResolutionService>();
+
+builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
+builder.Services.AddScoped<IOtpGenerator, OtpGenerator>();
+builder.Services.AddScoped<IEmailSender, DevEmailSender>();
+builder.Services.AddScoped<IOtpRepository, OtpRepository>();
+builder.Services.AddScoped<IOtpService, OtpService>();
+builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
+builder.Services.AddScoped<IUserAuthenticationService, UserAuthenticationService>();
 
 builder.Services.AddInfrastructure(builder.Configuration);
 
@@ -39,8 +60,23 @@ var devModeEnabled = builder.Configuration.GetValue<bool>("Authentication:DevMod
 
 if (devModeEnabled)
 {
-	builder.Services.AddAuthentication(DevAuthenticationHandler.SchemeName)
-		.AddScheme<AuthenticationSchemeOptions, DevAuthenticationHandler>(DevAuthenticationHandler.SchemeName, _ => { });
+	var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>() ?? new JwtSettings();
+
+	builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+		.AddJwtBearer(options =>
+		{
+			options.TokenValidationParameters = new TokenValidationParameters
+			{
+				ValidateIssuer = true,
+				ValidIssuer = jwtSettings.Issuer,
+				ValidateAudience = true,
+				ValidAudience = jwtSettings.Audience,
+				ValidateLifetime = true,
+				ValidateIssuerSigningKey = true,
+				IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Secret)),
+				ClockSkew = TimeSpan.FromMinutes(2), // small leeway for clock drift between machines
+			};
+		});
 }
 else
 {

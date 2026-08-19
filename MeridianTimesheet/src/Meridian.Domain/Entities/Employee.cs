@@ -39,4 +39,10 @@ public class Employee
     public ICollection<Employee> DirectReports { get; set; } = new List<Employee>();
     public ICollection<EmployeeRole> EmployeeRoles { get; set; } = new List<EmployeeRole>();
     public ICollection<EmployeeDepartment> EmployeeDepartments { get; set; } = new List<EmployeeDepartment>();
+
+	public string? PasswordHash { get; set; }
+	public bool MustChangePassword { get; set; }
+	public DateTime? LoginAccessGrantedAt { get; set; }
+	public int? LoginAccessGrantedByEmployeeId { get; set; }
+	public Employee? LoginAccessGrantedBy { get; set; }
 }

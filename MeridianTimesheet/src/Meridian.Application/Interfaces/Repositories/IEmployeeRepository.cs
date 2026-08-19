@@ -10,4 +10,5 @@ public interface IEmployeeRepository
     Task<IReadOnlyList<Employee>> GetDirectReportsAsync(int managerEmployeeId, CancellationToken ct = default);
     Task<IReadOnlyList<Employee>> GetAllAsync(CancellationToken ct = default);
     Task<bool> HasRoleAsync(int employeeId, string roleCode, CancellationToken ct = default);
+	Task SaveChangesAsync(CancellationToken ct = default);
 }

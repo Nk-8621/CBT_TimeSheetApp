@@ -26,4 +26,6 @@ public class EmployeeRepository(MeridianDbContext db) : IEmployeeRepository
 
     public async Task<IReadOnlyList<Employee>> GetAllAsync(CancellationToken ct = default) =>
         await db.Employees.AsNoTracking().ToListAsync(ct);
+
+	public Task SaveChangesAsync(CancellationToken ct = default) => db.SaveChangesAsync(ct);
 }

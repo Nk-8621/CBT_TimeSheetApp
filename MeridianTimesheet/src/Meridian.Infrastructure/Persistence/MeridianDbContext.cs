@@ -36,7 +36,9 @@ public class MeridianDbContext(DbContextOptions<MeridianDbContext> options) : Db
 
     public DbSet<Notification> Notifications => Set<Notification>();
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
+	public DbSet<Otp> Otps => Set<Otp>();
+
+	protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfiguration(new DepartmentConfiguration());
         modelBuilder.ApplyConfiguration(new LocationConfiguration());
@@ -60,5 +62,6 @@ public class MeridianDbContext(DbContextOptions<MeridianDbContext> options) : Db
         modelBuilder.ApplyConfiguration(new ApprovalEventConfiguration());
 
         modelBuilder.ApplyConfiguration(new NotificationConfiguration());
-    }
+		modelBuilder.ApplyConfiguration(new OtpConfiguration());
+	}
 }
