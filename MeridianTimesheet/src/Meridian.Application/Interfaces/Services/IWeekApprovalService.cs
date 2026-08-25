@@ -25,4 +25,6 @@ public interface IWeekApprovalService
     /// everything the Approvals screen needs in one call. Sorted flagged
     /// items first, matching the original wireframe.</summary>
     Task<IReadOnlyList<ApprovalQueueItemDto>> GetApprovalQueueAsync(string approverEmployeeCode, bool level2, CancellationToken ct = default);
+
+	Task<ApprovalQueueItemDto?> GetWeekDetailAsync(string employeeCode, DateOnly weekStartDate, CancellationToken ct = default);
 }

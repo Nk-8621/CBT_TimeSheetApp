@@ -8,7 +8,7 @@ namespace Meridian.Api.Controllers;
 [ApiController]
 [Route("api/approvals")]
 [Authorize]
-public class ApprovalsController(IWeekApprovalService approvalService, ICurrentUserService currentUser)
+public class ApprovalsController(IWeekApprovalService approvalService, ICurrentUserService currentUser, IEmployeeService employeeService, IWeekApprovalService weekApprovalService)
 	: MeridianControllerBase(currentUser)
 {
 	[HttpGet("validate/{employeeCode}/{weekStart}")]
@@ -70,5 +70,23 @@ public class ApprovalsController(IWeekApprovalService approvalService, ICurrentU
 	{
 		if (CurrentUser.EmployeeCode is null) return Unauthorized();
 		return Ok(await approvalService.GetApprovalQueueAsync(CurrentUser.EmployeeCode, level2, ct));
+	}
+
+	/// <summary>Same scoping as Team Compliance: your own direct reports, or
+	/// everyone if you're Admin.</summary>
+	[HttpGet("{employeeCode}/{weekStart}/detail")]
+	public async Task<IActionResult> GetWeekDetail(string employeeCode, DateOnly weekStart, CancellationToken ct)
+	{
+		if (currentUser.EmployeeCode is null) return Unauthorized();
+
+		if (!currentUser.IsAdmin)
+		{
+			var directReports = await employeeService.GetDirectReportsAsync(currentUser.EmployeeCode, ct);
+			if (!directReports.Any(e => e.EmployeeCode == employeeCode))
+				return Forbid();
+		}
+
+		var result = await weekApprovalService.GetWeekDetailAsync(employeeCode, weekStart, ct);
+		return result is null ? NotFound() : Ok(result);
 	}
 }

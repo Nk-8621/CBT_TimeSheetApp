@@ -15,7 +15,7 @@ public class UserAuthenticationService(
 {
 	public async Task<LoginResult?> LoginAsync(string employeeCode, string password, CancellationToken ct = default)
 	{
-		var employee = await employeeRepository.GetByCodeAsync(employeeCode, ct);
+		var employee = await employeeRepository.GetByCodeOrEmailAsync(employeeCode, ct);
 
 		if (employee is null || employee.PasswordHash is null || !passwordHasher.Verify(password, employee.PasswordHash))
 			return null;
@@ -79,4 +79,46 @@ public class UserAuthenticationService(
 		OtpVerificationOutcome.NoActiveOtp => "No active code found for this account. Request a new one.",
 		_ => "Could not verify the code. Request a new one.",
 	};
+
+	public async Task RequestPasswordResetAsync(string identifier, CancellationToken ct = default)
+	{
+		var employee = await employeeRepository.GetByCodeOrEmailAsync(identifier, ct);
+
+		if (employee is null || employee.PasswordHash is null || string.IsNullOrWhiteSpace(employee.Email))
+			return;
+
+		await otpService.RequestAsync(employee.EmployeeId, employee.Email, OtpPurpose.ForgotPassword, ct);
+	}
+
+	public async Task ResendPasswordResetOtpAsync(string identifier, CancellationToken ct = default)
+	{
+		var employee = await employeeRepository.GetByCodeOrEmailAsync(identifier, ct);
+		if (employee is null || employee.PasswordHash is null || string.IsNullOrWhiteSpace(employee.Email))
+			return;
+
+		await otpService.ResendAsync(employee.EmployeeId, employee.Email, OtpPurpose.ForgotPassword, ct);
+	}
+
+	public async Task<LoginResult> ResetPasswordAsync(
+		string identifier, string otpCode, string newPassword, string confirmNewPassword, CancellationToken ct = default)
+	{
+		var employee = await employeeRepository.GetByCodeOrEmailAsync(identifier, ct)
+			?? throw new BusinessRuleException(DescribeOtpFailure(OtpVerificationOutcome.NoActiveOtp));
+
+		var passwordErrors = PasswordPolicy.Validate(newPassword, confirmNewPassword);
+		if (passwordErrors.Count > 0)
+			throw new BusinessRuleException(string.Join(" ", passwordErrors));
+
+		var outcome = await otpService.VerifyAsync(employee.EmployeeId, OtpPurpose.ForgotPassword, otpCode, ct);
+		if (outcome != OtpVerificationOutcome.Success)
+			throw new BusinessRuleException(DescribeOtpFailure(outcome));
+
+		employee.PasswordHash = passwordHasher.Hash(newPassword);
+		employee.MustChangePassword = false;
+		await employeeRepository.SaveChangesAsync(ct);
+
+		var isAdmin = await employeeRepository.HasRoleAsync(employee.EmployeeId, "ADMIN", ct);
+		var issued = jwtTokenService.GenerateToken(employee.EmployeeCode, isAdmin);
+		return new LoginResult(RequiresOtpVerification: false, issued.Token, issued.ExpiresAtUtc, employee.EmployeeCode, employee.FullName);
+	}
 }

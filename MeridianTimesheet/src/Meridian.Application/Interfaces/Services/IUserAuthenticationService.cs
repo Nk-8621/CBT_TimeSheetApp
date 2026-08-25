@@ -16,4 +16,15 @@ public interface IUserAuthenticationService
 		string employeeCode, string otpCode, string newPassword, string confirmNewPassword, CancellationToken ct = default);
 
 	Task ResendFirstLoginOtpAsync(string employeeCode, CancellationToken ct = default);
+
+	/// <summary>Step 1 of forgot-password. Always succeeds from the caller's
+	/// point of view, regardless of whether the identifier matched a real
+	/// account — deliberately non-committal to avoid enabling enumeration.</summary>
+	Task RequestPasswordResetAsync(string identifier, CancellationToken ct = default);
+
+	Task ResendPasswordResetOtpAsync(string identifier, CancellationToken ct = default);
+
+	/// <summary>Step 2: verifies the OTP and sets a new password, then signs
+	/// the user straight in — same shape as the first-login flow.</summary>
+	Task<LoginResult> ResetPasswordAsync(string identifier, string otpCode, string newPassword, string confirmNewPassword, CancellationToken ct = default);
 }
