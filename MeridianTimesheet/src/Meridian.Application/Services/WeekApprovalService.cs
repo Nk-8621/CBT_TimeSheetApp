@@ -331,4 +331,68 @@ public class WeekApprovalService(
 			trail
 		);
 	}
+
+	public async Task<ApprovalQueueItemDto?> GetWeekDetailAsync(string employeeCode, DateOnly weekStartDate, CancellationToken ct = default)
+	{
+		var employee = await employeeRepository.GetByCodeAsync(employeeCode, ct);
+		if (employee is null) return null;
+
+		var week = await weekRecordRepository.GetOrCreateAsync(employee.EmployeeId, weekStartDate, ct);
+		var entries = await timeEntryRepository.GetForWeekAsync(employee.EmployeeId, weekStartDate, ct);
+		var dayTypeDtos = await dayTypeResolutionService.ResolveWeekAsync(employee.EmployeeId, weekStartDate, ct);
+		var dayTypes = dayTypeDtos.Select(d => Enum.Parse<DayType>(d.DayType)).ToList();
+
+		var departments = await masterDataRepository.GetDepartmentsAsync(ct);
+		var accounts = await masterDataRepository.GetAccountsAsync(ct);
+		var projects = await masterDataRepository.GetProjectsAsync(ct);
+		var modules = await masterDataRepository.GetModulesAsync(ct: ct);
+		var tasks = await masterDataRepository.GetTasksAsync(ct: ct);
+
+		var deptById = departments.ToDictionary(d => d.DepartmentId);
+		var accountById = accounts.ToDictionary(a => a.AccountId);
+		var projectById = projects.ToDictionary(p => p.ProjectId);
+		var moduleById = modules.ToDictionary(m => m.ModuleId);
+		var taskById = tasks.ToDictionary(t => t.TaskId);
+
+		var totalHours = entries.Sum(e => e.TotalHours);
+		var billableHours = entries.Where(e => e.IsBillable).Sum(e => e.TotalHours);
+		var projectCount = entries.Select(e => e.ProjectId).Distinct().Count();
+
+		var flagLines = entries.Select(e => new ApprovalFlagsCalculator.FlagLine(
+			taskById.TryGetValue(e.TaskId, out var flagTask) ? flagTask.Name : $"Task #{e.TaskId}",
+			e.Note, e.HoursByDay, e.IsBillable
+		)).ToList();
+		var flags = ApprovalFlagsCalculator.Calculate(flagLines, dayTypes);
+
+		var lines = entries.Select(e =>
+		{
+			projectById.TryGetValue(e.ProjectId, out var project);
+			var account = project is not null && accountById.TryGetValue(project.AccountId, out var acc) ? acc : null;
+			var department = account is not null && deptById.TryGetValue(account.DepartmentId, out var dept) ? dept : null;
+			moduleById.TryGetValue(e.ModuleId, out var module);
+			taskById.TryGetValue(e.TaskId, out var task);
+
+			return new ApprovalQueueLineDto(
+				department?.Code ?? "—",
+				account?.Name ?? "—",
+				account?.AccountType.ToString() ?? "—",
+				project?.Name ?? "—",
+				project?.Code ?? "—",
+				module?.Name ?? "—",
+				task?.Name ?? $"Task #{e.TaskId}",
+				e.IsBillable,
+				e.HoursByDay,
+				e.Note
+			);
+		}).ToList();
+
+		var employeeDepartmentName = deptById.TryGetValue(employee.DepartmentId, out var employeeDept) ? employeeDept.Name : "—";
+
+		return new ApprovalQueueItemDto(
+			employee.EmployeeCode, employee.FullName, employee.Designation, employeeDepartmentName,
+			week.WeekStartDate, week.SubmittedAt, week.Status.ToString(),
+			totalHours, billableHours, totalHours - billableHours, projectCount, entries.Count,
+			flags, lines, dayTypeDtos
+		);
+	}
 }

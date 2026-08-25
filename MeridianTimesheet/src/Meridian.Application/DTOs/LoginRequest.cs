@@ -6,5 +6,5 @@ using System.Threading.Tasks;
 
 namespace Meridian.Application.DTOs
 {
-	public record LoginRequest(string EmployeeCode, string Password);
+	public record LoginRequest(string Identifier, string Password);
 }

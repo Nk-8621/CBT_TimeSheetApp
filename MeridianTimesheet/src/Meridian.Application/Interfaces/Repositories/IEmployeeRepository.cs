@@ -11,4 +11,5 @@ public interface IEmployeeRepository
     Task<IReadOnlyList<Employee>> GetAllAsync(CancellationToken ct = default);
     Task<bool> HasRoleAsync(int employeeId, string roleCode, CancellationToken ct = default);
 	Task SaveChangesAsync(CancellationToken ct = default);
+	Task<Employee?> GetByCodeOrEmailAsync(string identifier, CancellationToken ct = default);
 }

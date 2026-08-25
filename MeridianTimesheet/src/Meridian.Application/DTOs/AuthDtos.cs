@@ -16,3 +16,6 @@ public record LoginResult(
 public record VerifyFirstLoginOtpRequest(string EmployeeCode, string OtpCode, string NewPassword, string ConfirmNewPassword);
 
 public record ResendOtpRequest(string EmployeeCode);
+
+public record RequestPasswordResetRequest(string Identifier);
+public record ResetPasswordRequest(string Identifier, string OtpCode, string NewPassword, string ConfirmNewPassword);

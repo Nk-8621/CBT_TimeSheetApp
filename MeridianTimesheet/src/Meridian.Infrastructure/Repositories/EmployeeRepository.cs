@@ -28,4 +28,9 @@ public class EmployeeRepository(MeridianDbContext db) : IEmployeeRepository
         await db.Employees.AsNoTracking().ToListAsync(ct);
 
 	public Task SaveChangesAsync(CancellationToken ct = default) => db.SaveChangesAsync(ct);
+
+	public Task<Employee?> GetByCodeOrEmailAsync(string identifier, CancellationToken ct = default) =>
+	identifier.Contains('@')
+		? db.Employees.FirstOrDefaultAsync(e => e.Email == identifier, ct)
+		: db.Employees.FirstOrDefaultAsync(e => e.EmployeeCode == identifier, ct);
 }
