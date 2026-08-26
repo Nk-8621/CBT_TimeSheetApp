@@ -15,7 +15,7 @@ public interface IMasterDataRepository
 	Task<IReadOnlyList<Module>> GetModulesAsync(int? projectId = null, CancellationToken ct = default);
 	Task<IReadOnlyList<WorkTask>> GetTasksAsync(int? moduleId = null, CancellationToken ct = default);
 	Task<IReadOnlyList<Holiday>> GetHolidaysAsync(DateOnly? from = null, DateOnly? to = null, CancellationToken ct = default);
-	Task<Holiday?> GetHolidayOnAsync(DateOnly date, CancellationToken ct = default);
+	Task<Holiday?> GetHolidayOnAsync(DateOnly date, int? accountId, CancellationToken ct = default);
 	Task<IReadOnlyList<TaskCategory>> GetTaskCategoriesAsync(CancellationToken ct = default);
 
 	// ---- Get by ID (needed before an update) ----

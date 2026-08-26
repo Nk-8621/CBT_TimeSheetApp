@@ -33,4 +33,7 @@ public class EmployeeRepository(MeridianDbContext db) : IEmployeeRepository
 	identifier.Contains('@')
 		? db.Employees.FirstOrDefaultAsync(e => e.Email == identifier, ct)
 		: db.Employees.FirstOrDefaultAsync(e => e.EmployeeCode == identifier, ct);
+
+	public async Task AddAsync(Employee employee, CancellationToken ct = default) =>
+	await db.Employees.AddAsync(employee, ct);
 }

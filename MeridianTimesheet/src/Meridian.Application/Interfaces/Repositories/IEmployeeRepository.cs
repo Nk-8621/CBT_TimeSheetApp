@@ -12,4 +12,5 @@ public interface IEmployeeRepository
     Task<bool> HasRoleAsync(int employeeId, string roleCode, CancellationToken ct = default);
 	Task SaveChangesAsync(CancellationToken ct = default);
 	Task<Employee?> GetByCodeOrEmailAsync(string identifier, CancellationToken ct = default);
+	Task AddAsync(Employee employee, CancellationToken ct = default);
 }

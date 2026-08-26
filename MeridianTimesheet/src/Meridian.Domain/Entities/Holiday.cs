@@ -12,4 +12,6 @@ public class Holiday
     public string Location { get; set; } = "All India";
     public string SourceSystem { get; set; } = "KEKA";
     public DateTime SyncedAt { get; set; }
+	public int? AccountId { get; set; }
+	public Account? Account { get; set; }
 }

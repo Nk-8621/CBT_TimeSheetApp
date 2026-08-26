@@ -236,14 +236,20 @@ public class MasterDataService(IMasterDataRepository repository) : IMasterDataSe
 		if (string.IsNullOrWhiteSpace(request.Name) || string.IsNullOrWhiteSpace(request.Location))
 			throw new BusinessRuleException("Holiday name and location are both required.");
 
+		if (request.AccountId is int accId)
+    _ = await repository.GetAccountByIdAsync(accId, ct) ?? throw new EntityNotFoundException(nameof(Account), accId);
+
 		var holiday = new Holiday
 		{
 			HolidayDate = request.HolidayDate,
 			Name = request.Name,
 			Location = request.Location,
+			AccountId = request.AccountId,
 			SourceSystem = "Manual",
 			SyncedAt = DateTime.UtcNow,
 		};
+
+		
 		await repository.AddHolidayAsync(holiday, ct);
 		await repository.SaveChangesAsync(ct);
 		return ToDto(holiday);
@@ -257,6 +263,12 @@ public class MasterDataService(IMasterDataRepository repository) : IMasterDataSe
 		if (request.HolidayDate is DateOnly date) holiday.HolidayDate = date;
 		if (request.Name is not null) holiday.Name = request.Name;
 		if (request.Location is not null) holiday.Location = request.Location;
+
+		if (request.AccountId is int accId)
+		{
+			_ = await repository.GetAccountByIdAsync(accId, ct) ?? throw new EntityNotFoundException(nameof(Account), accId);
+			holiday.AccountId = accId;
+		}
 		holiday.SourceSystem = "Manual"; // no longer purely KEKA-sourced once hand-edited
 		holiday.SyncedAt = DateTime.UtcNow;
 
@@ -289,5 +301,5 @@ public class MasterDataService(IMasterDataRepository repository) : IMasterDataSe
 	private static AccountDto ToDto(Account a) => new(a.AccountId, a.DepartmentId, a.Name, a.AccountType.ToString());
 	private static ProjectDto ToDto(Project p) => new(p.ProjectId, p.AccountId, p.Code, p.Name, p.DefaultBillable, p.IsActive);
 	private static WorkTaskDto ToDto(WorkTask t) => new(t.TaskId, t.ModuleId, t.Name);
-	private static HolidayDto ToDto(Holiday h) => new(h.HolidayId, h.HolidayDate, h.Name, h.Location);
+	private static HolidayDto ToDto(Holiday h) => new(h.HolidayId, h.HolidayDate, h.Name, h.Location, h.AccountId);
 }

@@ -1,4 +1,5 @@
 using Meridian.Application.DTOs;
+using Meridian.Domain.Entities;
 
 namespace Meridian.Application.Interfaces.Services;
 
@@ -18,4 +19,14 @@ public interface IEmployeeService
 	/// <summary>Every employee — callers must check Admin status themselves
 	/// before calling this (same enforcement pattern as the rest of the API).</summary>
 	Task<IReadOnlyList<EmployeeDto>> GetAllAsync(CancellationToken ct = default);
+
+	/// <summary>Creates a new employee — internal (real HR-assigned EmployeeCode
+	/// required) or external (synthetic EXT#### code auto-generated). Grants
+	/// portal access immediately with the same default password + forced
+	/// first-login flow as everyone else.</summary>
+	Task<EmployeeDto> CreateEmployeeAsync(CreateEmployeeRequest request, CancellationToken ct = default);
+
+	/// <summary>Sets which client's holiday calendar this employee follows.
+	/// AccountId null means "no specific client - company-wide holidays only".</summary>
+	Task SetPrimaryAccountAsync(string employeeCode, int? accountId, CancellationToken ct = default);
 }

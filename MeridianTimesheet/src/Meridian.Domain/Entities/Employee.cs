@@ -45,4 +45,8 @@ public class Employee
 	public DateTime? LoginAccessGrantedAt { get; set; }
 	public int? LoginAccessGrantedByEmployeeId { get; set; }
 	public Employee? LoginAccessGrantedBy { get; set; }
+
+	public bool IsExternal { get; set; }
+	public int? PrimaryAccountId { get; set; }
+	public Account? PrimaryAccount { get; set; }
 }

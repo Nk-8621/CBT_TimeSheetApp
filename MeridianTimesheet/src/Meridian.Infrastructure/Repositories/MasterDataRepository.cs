@@ -46,8 +46,8 @@ public class MasterDataRepository(MeridianDbContext db) : IMasterDataRepository
 		return await query.OrderBy(h => h.HolidayDate).ToListAsync(ct);
 	}
 
-	public Task<Holiday?> GetHolidayOnAsync(DateOnly date, CancellationToken ct = default) =>
-		db.Holidays.AsNoTracking().FirstOrDefaultAsync(h => h.HolidayDate == date, ct);
+	public Task<Holiday?> GetHolidayOnAsync(DateOnly date, int? accountId, CancellationToken ct = default) =>
+	db.Holidays.FirstOrDefaultAsync(h => h.HolidayDate == date && (h.AccountId == null || h.AccountId == accountId), ct);
 
 	public async Task<IReadOnlyList<TaskCategory>> GetTaskCategoriesAsync(CancellationToken ct = default) =>
 		await db.TaskCategories.AsNoTracking().ToListAsync(ct);

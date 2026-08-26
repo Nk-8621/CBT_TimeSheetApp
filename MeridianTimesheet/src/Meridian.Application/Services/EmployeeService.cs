@@ -1,11 +1,12 @@
 using Meridian.Application.DTOs;
+using Meridian.Application.Exceptions;
 using Meridian.Application.Interfaces.Repositories;
 using Meridian.Application.Interfaces.Services;
 using Meridian.Domain.Entities;
 
 namespace Meridian.Application.Services;
 
-public class EmployeeService(IEmployeeRepository employeeRepository) : IEmployeeService
+public class EmployeeService(IEmployeeRepository employeeRepository, IPasswordHasher passwordHasher) : IEmployeeService
 {
 	public async Task<EmployeeDto?> GetByCodeAsync(string employeeCode, CancellationToken ct = default)
 	{
@@ -68,5 +69,73 @@ public class EmployeeService(IEmployeeRepository employeeRepository) : IEmployee
 			employee.ManagerEmployeeId,
 			managerName
 		);
+	}
+
+	public async Task<EmployeeDto> CreateEmployeeAsync(CreateEmployeeRequest request, CancellationToken ct = default)
+	{
+		if (string.IsNullOrWhiteSpace(request.FullName))
+			throw new BusinessRuleException("Full name is required.");
+		if (string.IsNullOrWhiteSpace(request.Email))
+			throw new BusinessRuleException("Email is required.");
+
+		var manager = await employeeRepository.GetByCodeAsync(request.ManagerEmployeeCode, ct)
+			?? throw new BusinessRuleException($"Manager '{request.ManagerEmployeeCode}' not found.");
+
+		string employeeCode;
+		if (request.IsExternal)
+		{
+			employeeCode = await GenerateNextExternalCodeAsync(ct);
+		}
+		else
+		{
+			if (string.IsNullOrWhiteSpace(request.EmployeeCode))
+				throw new BusinessRuleException("Employee code is required for internal employees.");
+			if (await employeeRepository.GetByCodeAsync(request.EmployeeCode, ct) is not null)
+				throw new BusinessRuleException($"Employee code '{request.EmployeeCode}' is already in use.");
+			employeeCode = request.EmployeeCode;
+		}
+
+		var employee = new Employee
+		{
+			EmployeeCode = employeeCode,
+			FullName = request.FullName,
+			Initials = ComputeInitials(request.FullName),
+			JobTitleRaw = request.Designation, // no separate "raw" source for a freshly created record
+			Email = request.Email,
+			Designation = request.Designation,
+			DepartmentId = request.DepartmentId,
+			ManagerEmployeeId = manager.EmployeeId,
+			IsExternal = request.IsExternal,
+			PasswordHash = passwordHasher.Hash("cbt@2026"),
+			MustChangePassword = true,
+			LoginAccessGrantedAt = DateTime.UtcNow,
+		};
+
+		await employeeRepository.AddAsync(employee, ct);
+		await employeeRepository.SaveChangesAsync(ct);
+
+		return await ToDtoAsync(employee, ct);
+	}
+
+	private async Task<string> GenerateNextExternalCodeAsync(CancellationToken ct)
+	{
+		var everyone = await employeeRepository.GetAllAsync(ct);
+		var maxNumber = everyone
+			.Where(e => e.EmployeeCode.StartsWith("EXT", StringComparison.OrdinalIgnoreCase))
+			.Select(e => int.TryParse(e.EmployeeCode.AsSpan(3), out var n) ? n : 0)
+			.DefaultIfEmpty(0)
+			.Max();
+		return $"EXT{(maxNumber + 1):D4}";
+	}
+
+	private static string ComputeInitials(string fullName) =>
+	string.Concat(fullName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(p => char.ToUpperInvariant(p[0])));
+
+	public async Task SetPrimaryAccountAsync(string employeeCode, int? accountId, CancellationToken ct = default)
+	{
+		var employee = await employeeRepository.GetByCodeAsync(employeeCode, ct)
+			?? throw new EntityNotFoundException(nameof(Employee), employeeCode);
+		employee.PrimaryAccountId = accountId;
+		await employeeRepository.SaveChangesAsync(ct);
 	}
 }

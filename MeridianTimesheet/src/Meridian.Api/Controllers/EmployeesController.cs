@@ -1,3 +1,4 @@
+using Meridian.Application.DTOs;
 using Meridian.Application.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -48,4 +49,24 @@ public class EmployeesController(IEmployeeService employeeService, IAccessContro
 	[HttpGet("{employeeCode}/access")]
 	public async Task<IActionResult> GetAccess(string employeeCode, CancellationToken ct) =>
 		Ok(await accessControlService.GetAccessProfileAsync(employeeCode, ct));
+	
+
+	/// <summary>Creates a new employee (internal or external) and immediately
+/// grants portal access with the default password + forced first-login
+/// flow. Admin-only.</summary>
+[HttpPost]
+	public async Task<IActionResult> Create([FromBody] CreateEmployeeRequest request, CancellationToken ct)
+	{
+		if (!currentUser.IsAdmin) return Forbid();
+		var employee = await employeeService.CreateEmployeeAsync(request, ct);
+		return Ok(employee);
+	}
+
+	[HttpPut("{employeeCode}/primary-account")]
+	public async Task<IActionResult> SetPrimaryAccount(string employeeCode, [FromBody] SetPrimaryAccountRequest request, CancellationToken ct)
+	{
+		if (!currentUser.IsAdmin) return Forbid();
+		await employeeService.SetPrimaryAccountAsync(employeeCode, request.AccountId, ct);
+		return NoContent();
+	}
 }

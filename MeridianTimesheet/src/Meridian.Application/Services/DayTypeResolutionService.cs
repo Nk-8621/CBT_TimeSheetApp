@@ -9,10 +9,14 @@ namespace Meridian.Application.Services;
 public class DayTypeResolutionService(
 	IDayTypeRepository dayTypeRepository,
 	IMasterDataRepository masterDataRepository,
-	ILeaveRepository leaveRepository) : IDayTypeResolutionService
+	ILeaveRepository leaveRepository,
+	IEmployeeRepository employeeRepository) : IDayTypeResolutionService
 {
 	public async Task<List<DayTypeDto>> ResolveWeekAsync(int employeeId, DateOnly weekStartDate, CancellationToken ct = default)
 	{
+		var employee = await employeeRepository.GetByIdAsync(employeeId, ct);
+		var primaryAccountId = employee?.PrimaryAccountId;
+
 		var days = WeekMath.WeekDays(weekStartDate);
 		var overrides = await dayTypeRepository.GetForWeekAsync(employeeId, weekStartDate, ct);
 		var overrideByDate = overrides.ToDictionary(o => o.EntryDate, o => o.DayType);
@@ -22,7 +26,7 @@ public class DayTypeResolutionService(
 		var result = new List<DayTypeDto>(7);
 		foreach (var date in days)
 		{
-			var holiday = await masterDataRepository.GetHolidayOnAsync(date, ct);
+			var holiday = await masterDataRepository.GetHolidayOnAsync(date, primaryAccountId, ct);
 			var isOnLeave = leaveDates.Contains(date);
 			overrideByDate.TryGetValue(date, out var overrideType);
 

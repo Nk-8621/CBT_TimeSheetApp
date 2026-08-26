@@ -141,7 +141,7 @@ public class TimesheetService(
 				"Only 'W' (working) or 'WFH' can be set directly. Holiday and Leave are synced from the holiday " +
 				"calendar and KEKA respectively and can't be edited here.");
 
-		var holiday = await masterDataRepository.GetHolidayOnAsync(date, ct);
+		var holiday = await masterDataRepository.GetHolidayOnAsync(date, employee.PrimaryAccountId, ct);
 		if (holiday is not null)
 			throw new BusinessRuleException($"{date:d MMM} is a holiday ({holiday.Name}) and can't be changed here.");
 
