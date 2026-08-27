@@ -96,19 +96,23 @@ builder.Services.AddAuthorization();
 
 // ---- CORS (the React dev server runs on a different origin) ----
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
-	?? ["http://localhost:5173"];
+	?? ["http://localhost:5173", "http://172.16.0.177:8077","*"];
 
 builder.Services.AddCors(options =>
 {
-	options.AddPolicy("Frontend", policy =>
-		policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod());
+    options.AddPolicy("Frontend", policy =>
+    {
+        policy.WithOrigins("http://timesheet.carbynetech.com:8077")
+            .AllowAnyOrigin()
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
 });
-
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
-	if (devModeEnabled)
+	if (false)
 	{
 		// Dev mode reads a plain header, not a Bearer token — wire Swagger's
 		// Authorize button to match, so testing doesn't require curl/Postman.
@@ -153,13 +157,12 @@ var app = builder.Build();
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
-if (app.Environment.IsDevelopment())
-{
+
 	app.UseSwagger();
 	app.UseSwaggerUI();
-}
 
-app.UseHttpsRedirection();
+
+//app.UseHttpsRedirection();
 app.UseCors("Frontend");
 app.UseAuthentication();
 app.UseAuthorization();
