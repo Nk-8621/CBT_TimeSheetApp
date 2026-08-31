@@ -30,4 +30,4 @@ public record UpdateTaskRequest(string? Name);
 
 public record CreateHolidayRequest(DateOnly HolidayDate, string Name, string Location, int? AccountId = null);
 public record UpdateHolidayRequest(DateOnly? HolidayDate, string? Name, string? Location, int? AccountId = null);
-public record HolidayDto(int HolidayId, DateOnly HolidayDate, string Name, string Location, int? AccountId);
+public record HolidayDto(int HolidayId, DateOnly Date, string Name, string Location, int? AccountId);

@@ -45,6 +45,7 @@ builder.Services.AddScoped<IOtpRepository, OtpRepository>();
 builder.Services.AddScoped<IOtpService, OtpService>();
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IUserAuthenticationService, UserAuthenticationService>();
+builder.Services.AddScoped<ITimesheetExcelImportService, TimesheetExcelImportService>();
 
 builder.Services.AddInfrastructure(builder.Configuration);
 
