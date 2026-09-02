@@ -58,16 +58,17 @@ public class EmployeeService(IEmployeeRepository employeeRepository, IPasswordHa
 		}
 
 		return new EmployeeDto(
-			employee.EmployeeId,
-			employee.EmployeeCode,
-			employee.FullName,
-			employee.Initials,
-			employee.DepartmentId,
-			employee.LocationId,
-			employee.Designation,
-			employee.Grade,
-			employee.ManagerEmployeeId,
-			managerName
+		employee.EmployeeId,
+		employee.EmployeeCode,
+		employee.FullName,
+		employee.Initials,
+		employee.DepartmentId,
+		employee.LocationId,
+		employee.Designation,
+		employee.Grade,
+		employee.ManagerEmployeeId,
+		managerName,
+		employee.IsActive
 		);
 	}
 
@@ -136,6 +137,42 @@ public class EmployeeService(IEmployeeRepository employeeRepository, IPasswordHa
 		var employee = await employeeRepository.GetByCodeAsync(employeeCode, ct)
 			?? throw new EntityNotFoundException(nameof(Employee), employeeCode);
 		employee.PrimaryAccountId = accountId;
+		await employeeRepository.SaveChangesAsync(ct);
+	}
+
+	public async Task DeactivateEmployeeAsync(string employeeCode, string deactivatedByEmployeeCode, CancellationToken ct = default)
+	{
+		var employee = await employeeRepository.GetByCodeAsync(employeeCode, ct)
+			?? throw new EntityNotFoundException(nameof(Employee), employeeCode);
+
+		if (!employee.IsActive)
+			throw new BusinessRuleException($"{employeeCode} is already inactive.");
+
+		var actingAdmin = await employeeRepository.GetByCodeAsync(deactivatedByEmployeeCode, ct);
+
+		// Auto-reassign direct reports to this manager's own manager (skip-level).
+		var directReports = await employeeRepository.GetDirectReportsAsync(employee.EmployeeId, ct);
+		foreach (var report in directReports)
+			report.ManagerEmployeeId = employee.ManagerEmployeeId;
+
+		employee.IsActive = false;
+		employee.DeactivatedAt = DateTime.UtcNow;
+		employee.DeactivatedByEmployeeId = actingAdmin?.EmployeeId;
+
+		await employeeRepository.SaveChangesAsync(ct);
+	}
+
+	public async Task ReactivateEmployeeAsync(string employeeCode, CancellationToken ct = default)
+	{
+		var employee = await employeeRepository.GetByCodeAsync(employeeCode, ct)
+			?? throw new EntityNotFoundException(nameof(Employee), employeeCode);
+
+		employee.IsActive = true;
+		employee.DeactivatedAt = null;
+		employee.DeactivatedByEmployeeId = null;
+		// Deliberately NOT restoring former direct reports to this manager —
+		// they were already reassigned; someone can manually move them back if
+		// that's actually wanted.
 		await employeeRepository.SaveChangesAsync(ct);
 	}
 }

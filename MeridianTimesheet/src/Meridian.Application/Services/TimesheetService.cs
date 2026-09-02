@@ -25,7 +25,8 @@ public class TimesheetService(
 
 		var entryDtos = entries.Select(e => ToDto(e, employeeCode)).ToList();
 		var total = entries.Sum(e => e.TotalHours);
-		var billable = entries.Where(e => e.IsBillable).Sum(e => e.TotalHours);
+		var billable = entries.Where(e => e.Classification == "Billable").Sum(e => e.TotalHours);
+		var partialBillable = entries.Where(e => e.Classification == "PartialBillable").Sum(e => e.TotalHours);
 		var capacity = dayTypeDtos.Sum(d => d.CapacityHours);
 
 		return new WeekSummaryDto(
@@ -34,6 +35,7 @@ public class TimesheetService(
 			dayTypeDtos,
 			total,
 			billable,
+			partialBillable,
 			capacity
 		);
 	}
@@ -56,6 +58,7 @@ public class TimesheetService(
 				(record?.Status ?? WeekStatus.Draft).ToString(),
 				w.TotalHours,
 				w.BillableHours,
+				w.PartialBillableHours,
 				record?.SubmittedAt
 			);
 		});
@@ -66,7 +69,7 @@ public class TimesheetService(
 		var entryWeeks = weeklyTotals.Select(w => w.WeekStartDate).ToHashSet();
 		var fromRecordsOnly = weekRecords
 			.Where(r => !entryWeeks.Contains(r.WeekStartDate))
-			.Select(r => new WeekHistoryItemDto(r.WeekStartDate, r.Status.ToString(), 0m, 0m, r.SubmittedAt));
+			.Select(r => new WeekHistoryItemDto(r.WeekStartDate, r.Status.ToString(), 0m, 0m, 0m, r.SubmittedAt));
 
 		return fromEntries.Concat(fromRecordsOnly)
 			.OrderByDescending(w => w.WeekStartDate)
@@ -77,6 +80,7 @@ public class TimesheetService(
 	{
 		var employee = await RequireEmployeeAsync(employeeCode, ct);
 		await EnsureWeekEditableAsync(employee.EmployeeId, employeeCode, weekStartDate, ct);
+		BillingClassificationRules.Validate(request.Classification, request.BillingCategory);
 
 		var entry = new TimeEntry
 		{
@@ -85,7 +89,8 @@ public class TimesheetService(
 			ProjectId = request.ProjectId,
 			ModuleId = request.ModuleId,
 			TaskId = request.TaskId,
-			IsBillable = request.IsBillable,
+			Classification = request.Classification,
+			BillingCategory = request.BillingCategory,
 			Note = request.Note,
 			CreatedAt = DateTime.UtcNow,
 		};
@@ -108,10 +113,26 @@ public class TimesheetService(
 		if (request.ProjectId is int p) entry.ProjectId = p;
 		if (request.ModuleId is int m) entry.ModuleId = m;
 		if (request.TaskId is int t) entry.TaskId = t;
-		if (request.IsBillable is bool b) entry.IsBillable = b;
+		if (request.Classification is string cls) entry.Classification = cls;
+		if (request.BillingCategory is not null)
+		{
+			entry.BillingCategory = request.BillingCategory;
+		}
+		else if (entry.BillingCategory is not null
+			&& BillingClassificationRules.AllowedCategories.TryGetValue(entry.Classification, out var allowedCategories)
+			&& !allowedCategories.Contains(entry.BillingCategory))
+		{
+			// Classification changed (e.g. to PartialBillable, which allows no category at
+			// all) and left a now-incompatible category behind. UpdateTimeEntryRequest can't
+			// explicitly clear BillingCategory back to null, so if the caller didn't set a new
+			// one, drop the stale value here rather than blocking the save on a field the user
+			// never touched.
+			entry.BillingCategory = null;
+		}
 		if (request.Note is not null) entry.Note = request.Note;
 		if (request.HoursByDay is decimal[] hours) entry.HoursByDay = hours;
 		entry.UpdatedAt = DateTime.UtcNow;
+		BillingClassificationRules.Validate(entry.Classification, entry.BillingCategory);
 
 		await timeEntryRepository.SaveChangesAsync(ct);
 		return ToDto(entry, employee.EmployeeCode);
@@ -174,7 +195,8 @@ public class TimesheetService(
 				ProjectId = prev.ProjectId,
 				ModuleId = prev.ModuleId,
 				TaskId = prev.TaskId,
-				IsBillable = prev.IsBillable,
+				Classification = prev.Classification,
+				BillingCategory = prev.BillingCategory,
 				Note = null,
 				CreatedAt = DateTime.UtcNow,
 			};
@@ -208,7 +230,8 @@ public class TimesheetService(
 		entry.ProjectId,
 		entry.ModuleId,
 		entry.TaskId,
-		entry.IsBillable,
+		entry.Classification,
+		entry.BillingCategory,
 		entry.Note,
 		entry.HoursByDay
 	);

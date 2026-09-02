@@ -10,7 +10,10 @@ public record EmployeeDto(
     string Designation,
     string? Grade,
     int? ManagerEmployeeId,
-    string? ManagerName
+    string? ManagerName,
+	bool IsActive
 );
 
 public record RoleDto(string Code, string Name, IReadOnlyList<string> AllowedNavKeys);
+
+

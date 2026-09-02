@@ -69,4 +69,20 @@ public class EmployeesController(IEmployeeService employeeService, IAccessContro
 		await employeeService.SetPrimaryAccountAsync(employeeCode, request.AccountId, ct);
 		return NoContent();
 	}
+
+	[HttpPost("{employeeCode}/deactivate")]
+	public async Task<IActionResult> Deactivate(string employeeCode, CancellationToken ct)
+	{
+		if (!currentUser.IsAdmin || currentUser.EmployeeCode is null) return Forbid();
+		await employeeService.DeactivateEmployeeAsync(employeeCode, currentUser.EmployeeCode, ct);
+		return NoContent();
+	}
+
+	[HttpPost("{employeeCode}/reactivate")]
+	public async Task<IActionResult> Reactivate(string employeeCode, CancellationToken ct)
+	{
+		if (!currentUser.IsAdmin) return Forbid();
+		await employeeService.ReactivateEmployeeAsync(employeeCode, ct);
+		return NoContent();
+	}
 }

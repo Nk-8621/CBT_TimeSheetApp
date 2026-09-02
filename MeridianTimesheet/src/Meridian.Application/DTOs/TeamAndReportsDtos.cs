@@ -12,6 +12,7 @@ public record TeamComplianceRowDto(
 	string[] DailyDayTypes,     // Mon..Sun — W/WFH/L/H/O, drives the wireframe's per-day color coding
 	decimal CapacityHours,
 	decimal BillableHours,
+	decimal PartialBillableHours,
 	decimal NonBillableHours
 );
 
@@ -21,6 +22,7 @@ public record ProjectHoursReportRowDto(
 	string ProjectName,
 	string AccountName,
 	decimal BillableHours,
+	decimal PartialBillableHours,
 	decimal NonBillableHours,
 	decimal TotalHours,
 	int EmployeeCount
@@ -34,6 +36,7 @@ public record ReportRollupRowDto(
 	string SubLabel,
 	decimal TotalHours,
 	decimal BillableHours,
+	decimal PartialBillableHours,
 	decimal NonBillableHours,
 	int ResourceCount
 );
@@ -44,6 +47,7 @@ public record ReportRollupRowDto(
 public record ReportsSummaryDto(
 	decimal ActualHours,
 	decimal BillableHours,
+	decimal TotalPartialBillableHours,
 	decimal NonBillableHours,
 	int ResourcesReporting,
 	int ProjectsInScope,

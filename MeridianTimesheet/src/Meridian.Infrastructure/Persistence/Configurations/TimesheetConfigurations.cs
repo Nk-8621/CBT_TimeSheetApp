@@ -11,6 +11,8 @@ public class TimeEntryConfiguration : IEntityTypeConfiguration<TimeEntry>
         builder.ToTable("Carbynetech_TimeEntry");
         builder.HasKey(t => t.TimeEntryId);
         builder.Property(t => t.Note).HasMaxLength(500);
+        builder.Property(t => t.Classification).HasMaxLength(20).IsRequired();
+        builder.Property(t => t.BillingCategory).HasMaxLength(10);
 
         // HoursByDay/TotalHours are computed convenience accessors over the
         // seven real columns below — not columns themselves.

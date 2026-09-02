@@ -95,10 +95,10 @@ public class UserAuthenticationService(
 		var employee = await employeeRepository.GetByCodeOrEmailAsync(identifier, ct);
 		if (employee is null || employee.PasswordHash is null || string.IsNullOrWhiteSpace(employee.Email))
 			return;
-
+		if (!employee.IsActive)
+			return; // same generic failure as wrong credentials - don't reveal deactivation status
 		await otpService.ResendAsync(employee.EmployeeId, employee.Email, OtpPurpose.ForgotPassword, ct);
 	}
-
 	public async Task<LoginResult> ResetPasswordAsync(
 		string identifier, string otpCode, string newPassword, string confirmNewPassword, CancellationToken ct = default)
 	{

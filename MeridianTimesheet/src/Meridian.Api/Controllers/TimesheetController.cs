@@ -12,7 +12,7 @@ public class TimesheetController(ITimesheetService timesheetService, ICurrentUse
 	: MeridianControllerBase(currentUser)
 {
 	// Route constrained to look like a date (YYYY-MM-DD) so it can never
-	// accidentally match a literal path segment like "history".
+	
 	[HttpGet("{employeeCode}/{weekStart:regex(^\\d{{4}}-\\d{{2}}-\\d{{2}}$)}")]
 	public async Task<IActionResult> GetWeek(string employeeCode, DateOnly weekStart, CancellationToken ct)
 	{

@@ -36,11 +36,12 @@ public class TimeEntryRepository(MeridianDbContext db) : ITimeEntryRepository
 			{
 				WeekStartDate = g.Key,
 				Total = g.Sum(t => t.MondayHours + t.TuesdayHours + t.WednesdayHours + t.ThursdayHours + t.FridayHours + t.SaturdayHours + t.SundayHours),
-				Billable = g.Where(t => t.IsBillable).Sum(t => t.MondayHours + t.TuesdayHours + t.WednesdayHours + t.ThursdayHours + t.FridayHours + t.SaturdayHours + t.SundayHours),
+				Billable = g.Where(t => t.Classification == "Billable").Sum(t => t.MondayHours + t.TuesdayHours + t.WednesdayHours + t.ThursdayHours + t.FridayHours + t.SaturdayHours + t.SundayHours),
+				PartialBillable = g.Where(t => t.Classification == "PartialBillable").Sum(t => t.MondayHours + t.TuesdayHours + t.WednesdayHours + t.ThursdayHours + t.FridayHours + t.SaturdayHours + t.SundayHours),
 			})
 			.OrderByDescending(g => g.WeekStartDate)
 			.ToListAsync(ct);
 
-		return raw.Select(r => new WeeklyHoursAggregate(r.WeekStartDate, r.Total, r.Billable)).ToList();
+		return raw.Select(r => new WeeklyHoursAggregate(r.WeekStartDate, r.Total, r.Billable, r.PartialBillable)).ToList();
 	}
 }

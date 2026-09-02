@@ -2,7 +2,7 @@ using Meridian.Domain.Entities;
 
 namespace Meridian.Application.Interfaces.Repositories;
 
-public record WeeklyHoursAggregate(DateOnly WeekStartDate, decimal TotalHours, decimal BillableHours);
+public record WeeklyHoursAggregate(DateOnly WeekStartDate, decimal TotalHours, decimal BillableHours, decimal PartialBillableHours);
 
 public interface ITimeEntryRepository
 {

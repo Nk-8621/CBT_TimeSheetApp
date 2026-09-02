@@ -15,7 +15,8 @@ public class TimeEntry
     public int ProjectId { get; set; }
     public int ModuleId { get; set; }
     public int TaskId { get; set; }
-    public bool IsBillable { get; set; } = true;
+    public string Classification { get; set; } = "Billable";
+    public string? BillingCategory { get; set; }
     public string? Note { get; set; }
 
     public decimal MondayHours { get; set; }
