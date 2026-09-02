@@ -29,4 +29,9 @@ public interface IEmployeeService
 	/// <summary>Sets which client's holiday calendar this employee follows.
 	/// AccountId null means "no specific client - company-wide holidays only".</summary>
 	Task SetPrimaryAccountAsync(string employeeCode, int? accountId, CancellationToken ct = default);
+
+	Task DeactivateEmployeeAsync(string employeeCode, string deactivatedByEmployeeCode, CancellationToken ct = default);
+	Task ReactivateEmployeeAsync(string employeeCode, CancellationToken ct = default);
+
+
 }

@@ -25,6 +25,7 @@ public record WeekSummaryDto(
     IReadOnlyList<DayTypeDto> DayTypes,
     decimal TotalHours,
     decimal BillableHours,
+    decimal PartialBillableHours,
     decimal CapacityHours
 );
 
@@ -33,5 +34,6 @@ public record WeekHistoryItemDto(
 	string Status,
 	decimal TotalHours,
 	decimal BillableHours,
+	decimal PartialBillableHours,
 	DateTime? SubmittedAt
 );

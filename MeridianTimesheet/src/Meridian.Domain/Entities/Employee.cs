@@ -33,6 +33,7 @@ public class Employee
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
 
+
     public Department? Department { get; set; }
     public Location? Location { get; set; }
     public Employee? Manager { get; set; }
@@ -49,4 +50,8 @@ public class Employee
 	public bool IsExternal { get; set; }
 	public int? PrimaryAccountId { get; set; }
 	public Account? PrimaryAccount { get; set; }
+
+	public DateTime? DeactivatedAt { get; set; }
+	public int? DeactivatedByEmployeeId { get; set; }
+	public Employee? DeactivatedBy { get; set; }
 }

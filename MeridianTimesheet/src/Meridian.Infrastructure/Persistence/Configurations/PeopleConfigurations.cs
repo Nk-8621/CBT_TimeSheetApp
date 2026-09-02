@@ -34,7 +34,17 @@ public class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
             .WithMany(e => e.DirectReports)
             .HasForeignKey(e => e.ManagerEmployeeId)
             .OnDelete(DeleteBehavior.Restrict);
-    }
+
+		builder.HasOne(e => e.DeactivatedBy)
+				.WithMany()
+				.HasForeignKey(e => e.DeactivatedByEmployeeId)
+				.OnDelete(DeleteBehavior.Restrict);
+
+		builder.HasOne(e => e.LoginAccessGrantedBy)
+			.WithMany()
+			.HasForeignKey(e => e.LoginAccessGrantedByEmployeeId)
+			.OnDelete(DeleteBehavior.Restrict);
+	}
 }
 
 public class RoleConfiguration : IEntityTypeConfiguration<Role>

@@ -219,12 +219,14 @@ public class WeekApprovalService(
 			var dayTypes = dayTypeDtos.Select(d => Enum.Parse<DayType>(d.DayType)).ToList();
 
 			var total = entries.Sum(e => e.TotalHours);
-			var billable = entries.Where(e => e.IsBillable).Sum(e => e.TotalHours);
+			var billable = entries.Where(e => e.Classification == "Billable").Sum(e => e.TotalHours);
+			var partialBillable = entries.Where(e => e.Classification == "PartialBillable").Sum(e => e.TotalHours);
+			var nonBillable = entries.Where(e => e.Classification == "NonBillable").Sum(e => e.TotalHours);
 			var projectCount = entries.Select(e => e.ProjectId).Distinct().Count();
 
 			var flagLines = entries.Select(e => new ApprovalFlagsCalculator.FlagLine(
 				taskById.TryGetValue(e.TaskId, out var flagTask) ? flagTask.Name : $"Task #{e.TaskId}",
-				e.Note, e.HoursByDay, e.IsBillable
+				e.Note, e.HoursByDay, e.Classification
 			)).ToList();
 			var flags = ApprovalFlagsCalculator.Calculate(flagLines, dayTypes);
 
@@ -244,7 +246,8 @@ public class WeekApprovalService(
 					project?.Code ?? "—",
 					module?.Name ?? "—",
 					task?.Name ?? $"Task #{e.TaskId}",
-					e.IsBillable,
+					e.Classification,
+					e.BillingCategory,
 					e.HoursByDay,
 					e.Note
 				);
@@ -254,7 +257,7 @@ public class WeekApprovalService(
 				employee.EmployeeCode, employee.FullName, employee.Designation,
 				deptById.TryGetValue(employee.DepartmentId, out var employeeDept) ? employeeDept.Name : "—",
 				week.WeekStartDate, week.SubmittedAt, week.Status.ToString(),
-				total, billable, total - billable, projectCount, entries.Count,
+				total, billable, nonBillable, partialBillable, projectCount, entries.Count,
 				flags, lines, dayTypeDtos
 			));
 		}
@@ -355,12 +358,14 @@ public class WeekApprovalService(
 		var taskById = tasks.ToDictionary(t => t.TaskId);
 
 		var totalHours = entries.Sum(e => e.TotalHours);
-		var billableHours = entries.Where(e => e.IsBillable).Sum(e => e.TotalHours);
+		var billableHours = entries.Where(e => e.Classification == "Billable").Sum(e => e.TotalHours);
+		var partialBillableHours = entries.Where(e => e.Classification == "PartialBillable").Sum(e => e.TotalHours);
+		var nonBillableHours = entries.Where(e => e.Classification == "NonBillable").Sum(e => e.TotalHours);
 		var projectCount = entries.Select(e => e.ProjectId).Distinct().Count();
 
 		var flagLines = entries.Select(e => new ApprovalFlagsCalculator.FlagLine(
 			taskById.TryGetValue(e.TaskId, out var flagTask) ? flagTask.Name : $"Task #{e.TaskId}",
-			e.Note, e.HoursByDay, e.IsBillable
+			e.Note, e.HoursByDay, e.Classification
 		)).ToList();
 		var flags = ApprovalFlagsCalculator.Calculate(flagLines, dayTypes);
 
@@ -380,7 +385,8 @@ public class WeekApprovalService(
 				project?.Code ?? "—",
 				module?.Name ?? "—",
 				task?.Name ?? $"Task #{e.TaskId}",
-				e.IsBillable,
+				e.Classification,
+				e.BillingCategory,
 				e.HoursByDay,
 				e.Note
 			);
@@ -391,7 +397,7 @@ public class WeekApprovalService(
 		return new ApprovalQueueItemDto(
 			employee.EmployeeCode, employee.FullName, employee.Designation, employeeDepartmentName,
 			week.WeekStartDate, week.SubmittedAt, week.Status.ToString(),
-			totalHours, billableHours, totalHours - billableHours, projectCount, entries.Count,
+			totalHours, billableHours, nonBillableHours, partialBillableHours, projectCount, entries.Count,
 			flags, lines, dayTypeDtos
 		);
 	}

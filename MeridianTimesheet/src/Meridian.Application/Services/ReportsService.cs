@@ -19,7 +19,7 @@ public class ReportsService(
 		["ok"] = [WeekStatus.Approved],
 	};
 
-	private record Contribution(int DeptId, int AccountId, int ProjectId, int ModuleId, int TaskId, int EmployeeId, bool IsBillable, decimal Hours);
+	private record Contribution(int DeptId, int AccountId, int ProjectId, int ModuleId, int TaskId, int EmployeeId, string Classification, decimal Hours);
 
 	public async Task<IReadOnlyList<ProjectHoursReportRowDto>> GetProjectHoursAsync(
 		IReadOnlyList<int> employeeIds, DateOnly weekStart, CancellationToken ct = default)
@@ -29,6 +29,7 @@ public class ReportsService(
 		var accountById = accounts.ToDictionary(a => a.AccountId);
 
 		var billable = new Dictionary<int, decimal>();
+		var partialBillable = new Dictionary<int, decimal>();
 		var nonBillable = new Dictionary<int, decimal>();
 		var employeesByProject = new Dictionary<int, HashSet<int>>();
 
@@ -40,7 +41,8 @@ public class ReportsService(
 				var hours = entry.TotalHours;
 				if (hours == 0) continue;
 
-				if (entry.IsBillable) billable[entry.ProjectId] = billable.GetValueOrDefault(entry.ProjectId) + hours;
+				if (entry.Classification == "Billable") billable[entry.ProjectId] = billable.GetValueOrDefault(entry.ProjectId) + hours;
+				else if (entry.Classification == "PartialBillable") partialBillable[entry.ProjectId] = partialBillable.GetValueOrDefault(entry.ProjectId) + hours;
 				else nonBillable[entry.ProjectId] = nonBillable.GetValueOrDefault(entry.ProjectId) + hours;
 
 				if (!employeesByProject.TryGetValue(entry.ProjectId, out var set))
@@ -49,17 +51,18 @@ public class ReportsService(
 			}
 		}
 
-		var touchedProjectIds = billable.Keys.Union(nonBillable.Keys).ToHashSet();
+		var touchedProjectIds = billable.Keys.Union(partialBillable.Keys).Union(nonBillable.Keys).ToHashSet();
 
 		return projects
 			.Where(p => touchedProjectIds.Contains(p.ProjectId))
 			.Select(p =>
 			{
 				var b = billable.GetValueOrDefault(p.ProjectId);
+				var pb = partialBillable.GetValueOrDefault(p.ProjectId);
 				var nb = nonBillable.GetValueOrDefault(p.ProjectId);
 				var accountName = accountById.TryGetValue(p.AccountId, out var acc) ? acc.Name : "—";
 				return new ProjectHoursReportRowDto(
-					p.ProjectId, p.Code, p.Name, accountName, b, nb, b + nb,
+					p.ProjectId, p.Code, p.Name, accountName, b, pb, nb, b + pb + nb,
 					employeesByProject.GetValueOrDefault(p.ProjectId)?.Count ?? 0
 				);
 			})
@@ -104,7 +107,7 @@ public class ReportsService(
 
 					contributions.Add(new Contribution(
 						account.DepartmentId, account.AccountId, entry.ProjectId, entry.ModuleId, entry.TaskId,
-						employeeId, entry.IsBillable, hours));
+						employeeId, entry.Classification, hours));
 				}
 			}
 		}
@@ -115,10 +118,12 @@ public class ReportsService(
 				.Select(g =>
 				{
 					var (label, sub) = labelOf(g.Key);
-					var billable = g.Where(x => x.IsBillable).Sum(x => x.Hours);
+					var billable = g.Where(x => x.Classification == "Billable").Sum(x => x.Hours);
+					var partialBillable = g.Where(x => x.Classification == "PartialBillable").Sum(x => x.Hours);
+					var nonBillable = g.Where(x => x.Classification == "NonBillable").Sum(x => x.Hours);
 					var total = g.Sum(x => x.Hours);
 					var resources = g.Select(x => x.EmployeeId).Distinct().Count();
-					return new ReportRollupRowDto(label, sub, total, billable, total - billable, resources);
+					return new ReportRollupRowDto(label, sub, total, billable, partialBillable, nonBillable, resources);
 				})
 				.OrderByDescending(r => r.TotalHours)
 				.ToList();
@@ -157,10 +162,12 @@ public class ReportsService(
 		});
 
 		var totalHours = contributions.Sum(c => c.Hours);
-		var totalBillable = contributions.Where(c => c.IsBillable).Sum(c => c.Hours);
+		var totalBillable = contributions.Where(c => c.Classification == "Billable").Sum(c => c.Hours);
+		var totalPartialBillable = contributions.Where(c => c.Classification == "PartialBillable").Sum(c => c.Hours);
+		var totalNonBillable = contributions.Where(c => c.Classification == "NonBillable").Sum(c => c.Hours);
 
 		return new ReportsSummaryDto(
-			totalHours, totalBillable, totalHours - totalBillable,
+			totalHours, totalBillable, totalPartialBillable, totalNonBillable,
 			contributions.Select(c => c.EmployeeId).Distinct().Count(),
 			contributions.Select(c => c.ProjectId).Distinct().Count(),
 			contributions.Count,

@@ -15,6 +15,14 @@ namespace Meridian.Api.Controllers;
 [Authorize]
 public class TimesheetImportController(ITimesheetExcelImportService importService, ICurrentUserService currentUser) : ControllerBase
 {
+	/// <summary>Downloads the blank .xlsx template — same file shape ImportWeek expects back.</summary>
+	[HttpGet("template")]
+	public async Task<IActionResult> DownloadTemplate(CancellationToken ct)
+	{
+		var bytes = await importService.GenerateTemplateAsync(ct);
+		return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Meridian_Timesheet_Import_Template.xlsx");
+	}
+
 	/// <summary>Imports one week's task lines from an uploaded Excel file —
 	/// self-service only, an employee can only import their own data.</summary>
 	[HttpPost("{employeeCode}/{weekStart}")]

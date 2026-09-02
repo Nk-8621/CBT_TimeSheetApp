@@ -10,7 +10,7 @@ namespace Meridian.Application.Common;
 /// </summary>
 public static class ApprovalFlagsCalculator
 {
-	public record FlagLine(string TaskName, string? Note, decimal[] HoursByDay, bool IsBillable);
+	public record FlagLine(string TaskName, string? Note, decimal[] HoursByDay, string Classification);
 
 	private static readonly string[] DayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -37,7 +37,7 @@ public static class ApprovalFlagsCalculator
 				flags.Add($"Hours on {DayNames[i]} ({dayTypes[i]})");
 		}
 
-		var nonBillable = lines.Where(l => !l.IsBillable).Sum(l => l.HoursByDay.Sum());
+		var nonBillable = lines.Where(l => l.Classification == "NonBillable").Sum(l => l.HoursByDay.Sum());
 		if (total > 0 && nonBillable / total > 0.4m)
 			flags.Add($"{Math.Round(nonBillable / total * 100)}% non-billable");
 

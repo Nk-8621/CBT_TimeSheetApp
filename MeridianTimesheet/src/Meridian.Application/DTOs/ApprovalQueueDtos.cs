@@ -10,7 +10,8 @@ public record ApprovalQueueLineDto(
 	string ProjectCode,
 	string ModuleName,
 	string TaskName,
-	bool IsBillable,
+	string Classification,
+	string? BillingCategory,
 	decimal[] HoursByDay,
 	string? Note
 );
@@ -31,6 +32,7 @@ public record ApprovalQueueItemDto(
 	decimal TotalHours,
 	decimal BillableHours,
 	decimal NonBillableHours,
+	decimal PartialBillableHours,
 	int ProjectCount,
 	int LineCount,
 	IReadOnlyList<string> Flags,

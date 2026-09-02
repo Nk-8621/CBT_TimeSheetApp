@@ -46,7 +46,9 @@ public class TeamService(
 				dailyHours[i] = entries.Sum(e => e.HoursByDay[i]);
 
 			var total = dailyHours.Sum();
-			var billable = entries.Where(e => e.IsBillable).Sum(e => e.TotalHours);
+			var billable = entries.Where(e => e.Classification == "Billable").Sum(e => e.TotalHours);
+			var partialBillable = entries.Where(e => e.Classification == "PartialBillable").Sum(e => e.TotalHours);
+			var nonBillable = entries.Where(e => e.Classification == "NonBillable").Sum(e => e.TotalHours);
 			var capacity = dayTypeDtos.Sum(d => d.CapacityHours);
 			var hasLogged = entries.Count > 0;
 			var status = !hasLogged && week is null ? "NotStarted" : (week?.Status ?? WeekStatus.Draft).ToString();
@@ -56,7 +58,7 @@ public class TeamService(
 				employee.EmployeeCode, employee.FullName, employee.Designation, departmentName,
 				status, total, hasLogged,
 				dailyHours, dayTypeDtos.Select(d => d.DayType).ToArray(), capacity,
-				billable, total - billable
+				billable, partialBillable, nonBillable
 			));
 		}
 		return rows.OrderBy(r => r.FullName).ToList();

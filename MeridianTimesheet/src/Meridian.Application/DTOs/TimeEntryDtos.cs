@@ -7,7 +7,8 @@ public record TimeEntryDto(
     int ProjectId,
     int ModuleId,
     int TaskId,
-    bool IsBillable,
+    string Classification,
+    string? BillingCategory,
     string? Note,
     decimal[] HoursByDay // Monday..Sunday
 );
@@ -16,7 +17,8 @@ public record CreateTimeEntryRequest(
     int ProjectId,
     int ModuleId,
     int TaskId,
-    bool IsBillable,
+    string Classification,
+    string? BillingCategory,
     string? Note,
     decimal[] HoursByDay
 );
@@ -25,7 +27,8 @@ public record UpdateTimeEntryRequest(
     int? ProjectId,
     int? ModuleId,
     int? TaskId,
-    bool? IsBillable,
+    string? Classification,
+    string? BillingCategory,
     string? Note,
     decimal[]? HoursByDay
 );
