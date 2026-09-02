@@ -81,6 +81,8 @@ public class TimesheetService(
 		var employee = await RequireEmployeeAsync(employeeCode, ct);
 		await EnsureWeekEditableAsync(employee.EmployeeId, employeeCode, weekStartDate, ct);
 		BillingClassificationRules.Validate(request.Classification, request.BillingCategory);
+		if (string.IsNullOrWhiteSpace(request.Note))
+			throw new BusinessRuleException("A description is required for this task line.");
 
 		var entry = new TimeEntry
 		{
@@ -129,7 +131,18 @@ public class TimesheetService(
 			// never touched.
 			entry.BillingCategory = null;
 		}
-		if (request.Note is not null) entry.Note = request.Note;
+		if (request.Note is not null)
+		{
+			// Reject an explicit attempt to clear the description to blank, but don't
+			// require Note on updates that never touch it (e.g. an hours-only edit typed
+			// directly into the week grid) - otherwise a pre-existing line with no
+			// description (like one carried forward from last week) couldn't have its
+			// hours edited until someone opens it in the drawer, which is the one place
+			// a blank Note truly can't be saved (see AddEntryAsync / EntryDrawer.tsx).
+			if (string.IsNullOrWhiteSpace(request.Note))
+				throw new BusinessRuleException("A description is required for this task line.");
+			entry.Note = request.Note;
+		}
 		if (request.HoursByDay is decimal[] hours) entry.HoursByDay = hours;
 		entry.UpdatedAt = DateTime.UtcNow;
 		BillingClassificationRules.Validate(entry.Classification, entry.BillingCategory);
