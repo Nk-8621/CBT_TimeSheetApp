@@ -1,4 +1,4 @@
-﻿namespace Meridian.Application.DTOs;
+namespace Meridian.Application.DTOs;
 
 public record TeamComplianceRowDto(
 	string EmployeeCode,
@@ -10,6 +10,7 @@ public record TeamComplianceRowDto(
 	bool HasLogged,
 	decimal[] DailyHours,       // Mon..Sun
 	string[] DailyDayTypes,     // Mon..Sun — W/WFH/L/H/O, drives the wireframe's per-day color coding
+	string?[] DailyLeaveHalf,   // Mon..Sun — "LeaveFirstHalf"/"LeaveSecondHalf" where DailyDayTypes is "LH", else null
 	decimal CapacityHours,
 	decimal BillableHours,
 	decimal PartialBillableHours,

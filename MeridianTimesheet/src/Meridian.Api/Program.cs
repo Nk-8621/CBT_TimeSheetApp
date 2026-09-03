@@ -37,6 +37,7 @@ builder.Services.AddScoped<ITeamService, TeamService>();
 builder.Services.AddScoped<IReportsService, ReportsService>();
 builder.Services.AddScoped<IAccessControlService, AccessControlService>();
 builder.Services.AddScoped<IDayTypeResolutionService, DayTypeResolutionService>();
+builder.Services.AddScoped<IDayTypeRequestService, DayTypeRequestService>();
 
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
 builder.Services.AddScoped<IOtpGenerator, OtpGenerator>();

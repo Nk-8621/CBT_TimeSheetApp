@@ -21,12 +21,15 @@ public class WeekApprovalService(
 	{
 		var employee = await RequireEmployeeAsync(employeeCode, ct);
 		var entries = await timeEntryRepository.GetForWeekAsync(employee.EmployeeId, weekStartDate, ct);
-		var overrides = await dayTypeRepository.GetForWeekAsync(employee.EmployeeId, weekStartDate, ct);
-		var overrideByDate = overrides.ToDictionary(o => o.EntryDate, o => o.DayType);
 
-		var days = WeekMath.WeekDays(weekStartDate);
-		var dayTypes = days.Select(d => overrideByDate.TryGetValue(d, out var t) ? t
-			: WeekMath.IsWeekend(d) ? DayType.O : DayType.W).ToList();
+		// Resolved the same way the timesheet itself and the approval queue
+		// see it (holiday / KEKA leave / Meridian half-or-full leave request /
+		// WFH override), rather than reconstructing a simplified version here -
+		// otherwise a half-day-leave day would get validated as if it needed a
+		// full 8h, and a holiday or a KEKA leave day wouldn't be recognized at
+		// all (both real gaps this used to have before DayTypeRequest existed).
+		var dayTypeDtos = await dayTypeResolutionService.ResolveWeekAsync(employee.EmployeeId, weekStartDate, ct);
+		var dayTypes = dayTypeDtos.Select(d => Enum.Parse<DayType>(d.DayType)).ToList();
 
 		var lines = entries.Select(e => new ValidationLine(
 			e.Task?.Name ?? $"Task #{e.TaskId}", e.Note, e.HoursByDay

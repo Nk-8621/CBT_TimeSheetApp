@@ -51,6 +51,25 @@ public class DayTypeOverrideConfiguration : IEntityTypeConfiguration<DayTypeOver
     }
 }
 
+public class DayTypeRequestConfiguration : IEntityTypeConfiguration<DayTypeRequest>
+{
+    public void Configure(EntityTypeBuilder<DayTypeRequest> builder)
+    {
+        builder.ToTable("Carbynetech_DayTypeRequest");
+        builder.HasKey(r => r.DayTypeRequestId);
+        builder.Property(r => r.RequestType).HasConversion<string>().HasMaxLength(20).IsRequired();
+        builder.Property(r => r.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
+        builder.Property(r => r.Note).HasMaxLength(500);
+        builder.Property(r => r.DecisionComment).HasMaxLength(500);
+        builder.Property(r => r.Source).HasMaxLength(20).IsRequired();
+        builder.Property(r => r.ExternalRef).HasMaxLength(100);
+        builder.HasIndex(r => new { r.EmployeeId, r.RequestDate });
+
+        builder.HasOne(r => r.Employee).WithMany().HasForeignKey(r => r.EmployeeId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(r => r.Approver).WithMany().HasForeignKey(r => r.ApproverEmployeeId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
 public class WeekRecordConfiguration : IEntityTypeConfiguration<WeekRecord>
 {
     public void Configure(EntityTypeBuilder<WeekRecord> builder)
