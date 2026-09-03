@@ -25,8 +25,12 @@ public class DayTypeRequestService(
 			throw new BusinessRuleException("Request type must be one of WFH, LeaveFirstHalf, LeaveSecondHalf or LeaveFull.");
 		if (string.IsNullOrWhiteSpace(note))
 			throw new BusinessRuleException("A note is required for this request.");
-		if (date < DateOnly.FromDateTime(DateTime.UtcNow))
-			throw new BusinessRuleException("WFH/Leave can only be requested for today or a future date, not a day that's already passed.");
+		// Past dates are allowed up to a month back (e.g. catching up on a
+		// WFH/Leave day that was missed at the time), but no further - there's
+		// no upper bound on how far into the future one can be requested.
+		var earliestAllowedDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(-1);
+		if (date < earliestAllowedDate)
+			throw new BusinessRuleException($"WFH/Leave can only be requested for a date within the last month (on or after {earliestAllowedDate:d MMM}) or a future date.");
 
 		await EnsureWeekEditableAsync(employee.EmployeeId, employeeCode, WeekMath.MondayOf(date), ct);
 
