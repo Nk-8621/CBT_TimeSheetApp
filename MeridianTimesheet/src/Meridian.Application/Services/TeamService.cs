@@ -1,4 +1,4 @@
-﻿using Meridian.Application.DTOs;
+using Meridian.Application.DTOs;
 using Meridian.Application.Exceptions;
 using Meridian.Application.Interfaces.Repositories;
 using Meridian.Application.Interfaces.Services;
@@ -57,7 +57,8 @@ public class TeamService(
 			rows.Add(new TeamComplianceRowDto(
 				employee.EmployeeCode, employee.FullName, employee.Designation, departmentName,
 				status, total, hasLogged,
-				dailyHours, dayTypeDtos.Select(d => d.DayType).ToArray(), capacity,
+				dailyHours, dayTypeDtos.Select(d => d.DayType).ToArray(),
+				dayTypeDtos.Select(d => d.RequestType).ToArray(), capacity,
 				billable, partialBillable, nonBillable
 			));
 		}

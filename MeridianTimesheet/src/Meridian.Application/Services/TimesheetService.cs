@@ -14,7 +14,8 @@ public class TimesheetService(
 	IDayTypeRepository dayTypeRepository,
 	IWeekRecordRepository weekRecordRepository,
 	IMasterDataRepository masterDataRepository,
-	IDayTypeResolutionService dayTypeResolutionService) : ITimesheetService
+	IDayTypeResolutionService dayTypeResolutionService,
+	IDayTypeRequestRepository dayTypeRequestRepository) : ITimesheetService
 {
 	public async Task<WeekSummaryDto> GetWeekAsync(string employeeCode, DateOnly weekStartDate, CancellationToken ct = default)
 	{
@@ -29,6 +30,11 @@ public class TimesheetService(
 		var partialBillable = entries.Where(e => e.Classification == "PartialBillable").Sum(e => e.TotalHours);
 		var capacity = dayTypeDtos.Sum(d => d.CapacityHours);
 
+		var dayTypeRequests = await dayTypeRequestRepository.GetForEmployeeWeekAsync(employee.EmployeeId, weekStartDate, ct);
+		var dayTypeRequestDtos = new List<DayTypeRequestDto>(dayTypeRequests.Count);
+		foreach (var request in dayTypeRequests)
+			dayTypeRequestDtos.Add(await ToDayTypeRequestDtoAsync(request, employee, ct));
+
 		return new WeekSummaryDto(
 			ToWeekRecordDto(employeeCode, weekStartDate, weekRecord),
 			entryDtos,
@@ -36,7 +42,32 @@ public class TimesheetService(
 			total,
 			billable,
 			partialBillable,
-			capacity
+			capacity,
+			dayTypeRequestDtos
+		);
+	}
+
+	private async Task<DayTypeRequestDto> ToDayTypeRequestDtoAsync(Domain.Entities.DayTypeRequest request, Employee employee, CancellationToken ct)
+	{
+		string? approverName = null;
+		if (request.ApproverEmployeeId is int approverId)
+		{
+			var approver = await employeeRepository.GetByIdAsync(approverId, ct);
+			approverName = approver?.FullName;
+		}
+
+		return new DayTypeRequestDto(
+			request.DayTypeRequestId,
+			employee.EmployeeCode,
+			employee.FullName,
+			request.RequestDate,
+			request.RequestType.ToString(),
+			request.Status.ToString(),
+			request.Note,
+			request.SubmittedAt,
+			approverName,
+			request.DecidedAt,
+			request.DecisionComment
 		);
 	}
 

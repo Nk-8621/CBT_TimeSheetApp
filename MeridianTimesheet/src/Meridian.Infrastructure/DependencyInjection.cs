@@ -21,6 +21,7 @@ public static class DependencyInjection
         services.AddScoped<ITimeEntryRepository, TimeEntryRepository>();
         services.AddScoped<IWeekRecordRepository, WeekRecordRepository>();
         services.AddScoped<IDayTypeRepository, DayTypeRepository>();
+        services.AddScoped<IDayTypeRequestRepository, DayTypeRequestRepository>();
         services.AddScoped<ILeaveRepository, LeaveRepository>();
 		services.AddScoped<INotificationRepository, NotificationRepository>();
 

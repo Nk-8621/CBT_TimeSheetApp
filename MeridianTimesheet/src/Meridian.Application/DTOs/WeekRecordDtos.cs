@@ -26,7 +26,8 @@ public record WeekSummaryDto(
     decimal TotalHours,
     decimal BillableHours,
     decimal PartialBillableHours,
-    decimal CapacityHours
+    decimal CapacityHours,
+    IReadOnlyList<DayTypeRequestDto> DayTypeRequests
 );
 
 public record WeekHistoryItemDto(

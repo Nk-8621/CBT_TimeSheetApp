@@ -15,16 +15,43 @@ public enum WeekStatus
 }
 
 /// <summary>
-/// Matches the CHECK constraint on Carbynetech_DayTypeOverride.DayType.
-/// W = working, WFH = work from home, L = leave, H = holiday, O = weekly off.
+/// The DayTypeOverride table's own CHECK constraint only allows W/WFH/L/H/O
+/// (see Carbynetech_DayTypeOverride.DayType) - LH (half-day leave) is never
+/// written there. It only ever comes out of DayTypeResolver, computed from an
+/// active Meridian half-day leave request (see DayTypeRequest), so it needs
+/// no corresponding change to that constraint.
+/// W = working, WFH = work from home, L = leave (full day), LH = leave
+/// (half day - 4h leave, 4h still worked), H = holiday, O = weekly off.
 /// </summary>
 public enum DayType
 {
     W,
     WFH,
     L,
+    LH,
     H,
     O,
+}
+
+/// <summary>What an employee is asking to change a day to. Matches the CHECK
+/// constraint on Carbynetech_DayTypeRequest.RequestType. LeaveFirstHalf and
+/// LeaveSecondHalf both resolve to the same DayType.LH (4h leave, 4h still
+/// worked) - which half only matters for what the request itself records,
+/// not for capacity or grid resolution.</summary>
+public enum DayTypeRequestType
+{
+    WFH,
+    LeaveFirstHalf,
+    LeaveSecondHalf,
+    LeaveFull,
+}
+
+/// <summary>Matches the CHECK constraint on Carbynetech_DayTypeRequest.Status.</summary>
+public enum DayTypeRequestStatus
+{
+    Pending,
+    Approved,
+    Rejected,
 }
 
 /// <summary>

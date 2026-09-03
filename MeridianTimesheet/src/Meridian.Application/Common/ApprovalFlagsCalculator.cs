@@ -22,7 +22,12 @@ public static class ApprovalFlagsCalculator
 			for (var i = 0; i < 7; i++)
 				dayTotals[i] += line.HoursByDay[i];
 
-		var capacity = dayTypes.Select(t => t is DayType.W or DayType.WFH ? WeekMath.StandardHoursPerDay : 0m).ToArray();
+		var capacity = dayTypes.Select(t => t switch
+		{
+			DayType.W or DayType.WFH => WeekMath.StandardHoursPerDay,
+			DayType.LH => WeekMath.StandardHoursPerDay / 2,
+			_ => 0m,
+		}).ToArray();
 		var total = dayTotals.Sum();
 		var capacityTotal = capacity.Sum();
 

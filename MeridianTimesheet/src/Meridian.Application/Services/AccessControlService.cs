@@ -50,8 +50,14 @@ public class AccessControlService(IEmployeeRepository employeeRepository) : IAcc
 
 		var nav = new List<string>();
 		if (requiresTimesheet) { nav.Add("ts"); nav.Add("hist"); }
+		// WFH/Leave requests: everyone who fills a timesheet can ask for one -
+		// including a manager asking for their own, which goes to their own
+		// manager exactly like a normal approval does.
+		if (requiresTimesheet) nav.Add("req");
 		if (isLevel1ApproverForSomeone) nav.Add("ap1");
 		if (isLevel2ApproverForSomeone) nav.Add("ap2");
+		// Request approval is Level 1 only - there's no Level 2 step for these.
+		if (isLevel1ApproverForSomeone) nav.Add("reqap");
 		if (isLevel1ApproverForSomeone || isLevel2ApproverForSomeone || isAdmin) { nav.Add("team"); nav.Add("rep"); }
 		if (isAdmin) nav.Add("mast");
 		nav.Add("notif");
