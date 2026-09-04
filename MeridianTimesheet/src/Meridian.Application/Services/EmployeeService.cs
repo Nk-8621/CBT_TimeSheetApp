@@ -68,7 +68,8 @@ public class EmployeeService(IEmployeeRepository employeeRepository, IPasswordHa
 		employee.Grade,
 		employee.ManagerEmployeeId,
 		managerName,
-		employee.IsActive
+		employee.IsActive,
+		employee.PrimaryAccountId
 		);
 	}
 
@@ -105,6 +106,7 @@ public class EmployeeService(IEmployeeRepository employeeRepository, IPasswordHa
 			Email = request.Email,
 			Designation = request.Designation,
 			DepartmentId = request.DepartmentId,
+			LocationId = manager.LocationId, // new employees default to their manager's location; there's no location picker on the create form
 			ManagerEmployeeId = manager.EmployeeId,
 			IsExternal = request.IsExternal,
 			PasswordHash = passwordHasher.Hash("cbt@2026"),
