@@ -6,7 +6,7 @@ using Meridian.Domain.Entities;
 
 namespace Meridian.Application.Services;
 
-public class EmployeeService(IEmployeeRepository employeeRepository, IPasswordHasher passwordHasher) : IEmployeeService
+public class EmployeeService(IEmployeeRepository employeeRepository) : IEmployeeService
 {
 	public async Task<EmployeeDto?> GetByCodeAsync(string employeeCode, CancellationToken ct = default)
 	{
@@ -109,8 +109,6 @@ public class EmployeeService(IEmployeeRepository employeeRepository, IPasswordHa
 			LocationId = manager.LocationId, // new employees default to their manager's location; there's no location picker on the create form
 			ManagerEmployeeId = manager.EmployeeId,
 			IsExternal = request.IsExternal,
-			PasswordHash = passwordHasher.Hash("cbt@2026"),
-			MustChangePassword = true,
 			LoginAccessGrantedAt = DateTime.UtcNow,
 		};
 
