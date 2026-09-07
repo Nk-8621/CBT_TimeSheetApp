@@ -178,7 +178,7 @@ public class TimesheetExcelImportService(
 			if (string.IsNullOrWhiteSpace(cellValue)) { hoursByDay[i] = 0; continue; }
 
 			if (!decimal.TryParse(cellValue, out var hours) || hours < 0)
-				return (null, $"Row {rowNumber}: '{cellValue}' isn't a valid number of hours.");
+				return (null, $"Row {rowNumber}: '{cellValue}' isn't a valid number of hours given.");
 
 			hoursByDay[i] = hours;
 		}
