@@ -14,22 +14,79 @@ public class ProjectConfiguration : IEntityTypeConfiguration<Project>
         builder.Property(p => p.Name).HasMaxLength(200).IsRequired();
         builder.HasIndex(p => p.Code).IsUnique();
 
+        builder.Property(p => p.ProjectTech).HasMaxLength(100);
+        builder.Property(p => p.BillingType).HasMaxLength(30);
+        builder.Property(p => p.CustomerPO).HasMaxLength(200);
+        builder.Property(p => p.Notes).HasMaxLength(1000);
+
         builder.HasOne(p => p.Account)
             .WithMany(a => a.Projects)
             .HasForeignKey(p => p.AccountId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(p => p.ProjectType)
+            .WithMany()
+            .HasForeignKey(p => p.ProjectTypeId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(p => p.ProjectLeadEmployee)
+            .WithMany()
+            .HasForeignKey(p => p.ProjectLeadEmployeeId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(p => p.ProjectManagerEmployee)
+            .WithMany()
+            .HasForeignKey(p => p.ProjectManagerEmployeeId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(p => p.DeliveryHeadEmployee)
+            .WithMany()
+            .HasForeignKey(p => p.DeliveryHeadEmployeeId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }
 
-public class TaskCategoryConfiguration : IEntityTypeConfiguration<TaskCategory>
+public class ProjectTypeConfiguration : IEntityTypeConfiguration<ProjectType>
 {
-    public void Configure(EntityTypeBuilder<TaskCategory> builder)
+    public void Configure(EntityTypeBuilder<ProjectType> builder)
     {
-        builder.ToTable("Carbynetech_TaskCategory");
-        builder.HasKey(t => t.TaskCategoryId);
+        builder.ToTable("Carbynetech_ProjectType");
+        builder.HasKey(t => t.ProjectTypeId);
         builder.Property(t => t.Code).HasMaxLength(20).IsRequired();
         builder.Property(t => t.Name).HasMaxLength(100).IsRequired();
         builder.HasIndex(t => t.Code).IsUnique();
+    }
+}
+
+public class ProjectTypeModuleTemplateConfiguration : IEntityTypeConfiguration<ProjectTypeModuleTemplate>
+{
+    public void Configure(EntityTypeBuilder<ProjectTypeModuleTemplate> builder)
+    {
+        builder.ToTable("Carbynetech_ProjectTypeModuleTemplate");
+        builder.HasKey(t => t.ProjectTypeModuleTemplateId);
+        builder.Property(t => t.Name).HasMaxLength(150).IsRequired();
+        builder.HasIndex(t => new { t.ProjectTypeId, t.Name }).IsUnique();
+
+        builder.HasOne(t => t.ProjectType)
+            .WithMany(pt => pt.ModuleTemplates)
+            .HasForeignKey(t => t.ProjectTypeId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+public class ProjectTypeTaskTemplateConfiguration : IEntityTypeConfiguration<ProjectTypeTaskTemplate>
+{
+    public void Configure(EntityTypeBuilder<ProjectTypeTaskTemplate> builder)
+    {
+        builder.ToTable("Carbynetech_ProjectTypeTaskTemplate");
+        builder.HasKey(t => t.ProjectTypeTaskTemplateId);
+        builder.Property(t => t.Name).HasMaxLength(150).IsRequired();
+        builder.HasIndex(t => new { t.ProjectTypeModuleTemplateId, t.Name }).IsUnique();
+
+        builder.HasOne(t => t.ModuleTemplate)
+            .WithMany(m => m.TaskTemplates)
+            .HasForeignKey(t => t.ProjectTypeModuleTemplateId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }
 
@@ -47,10 +104,15 @@ public class ModuleConfiguration : IEntityTypeConfiguration<Module>
             .HasForeignKey(m => m.ProjectId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasOne(m => m.TaskCategory)
+        // SetNull (not Restrict) - Module.ProjectTypeId is just lineage
+        // ("which template generated this module"), not load-bearing for the
+        // timesheet grid. Letting it null out means deleting a ProjectType
+        // never gets blocked by Modules it previously generated, on top of
+        // the explicit Project-level reassignment in DeleteProjectTypeAsync.
+        builder.HasOne(m => m.ProjectType)
             .WithMany()
-            .HasForeignKey(m => m.TaskCategoryId)
-            .OnDelete(DeleteBehavior.Restrict);
+            .HasForeignKey(m => m.ProjectTypeId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }
 

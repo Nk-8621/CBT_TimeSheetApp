@@ -17,7 +17,9 @@ public class MeridianDbContext(DbContextOptions<MeridianDbContext> options) : Db
     public DbSet<Location> Locations => Set<Location>();
     public DbSet<Account> Accounts => Set<Account>();
     public DbSet<Project> Projects => Set<Project>();
-    public DbSet<TaskCategory> TaskCategories => Set<TaskCategory>();
+    public DbSet<ProjectType> ProjectTypes => Set<ProjectType>();
+    public DbSet<ProjectTypeModuleTemplate> ProjectTypeModuleTemplates => Set<ProjectTypeModuleTemplate>();
+    public DbSet<ProjectTypeTaskTemplate> ProjectTypeTaskTemplates => Set<ProjectTypeTaskTemplate>();
     public DbSet<Module> Modules => Set<Module>();
     public DbSet<WorkTask> Tasks => Set<WorkTask>();
 
@@ -45,7 +47,9 @@ public class MeridianDbContext(DbContextOptions<MeridianDbContext> options) : Db
         modelBuilder.ApplyConfiguration(new LocationConfiguration());
         modelBuilder.ApplyConfiguration(new AccountConfiguration());
         modelBuilder.ApplyConfiguration(new ProjectConfiguration());
-        modelBuilder.ApplyConfiguration(new TaskCategoryConfiguration());
+        modelBuilder.ApplyConfiguration(new ProjectTypeConfiguration());
+        modelBuilder.ApplyConfiguration(new ProjectTypeModuleTemplateConfiguration());
+        modelBuilder.ApplyConfiguration(new ProjectTypeTaskTemplateConfiguration());
         modelBuilder.ApplyConfiguration(new ModuleConfiguration());
         modelBuilder.ApplyConfiguration(new WorkTaskConfiguration());
 
