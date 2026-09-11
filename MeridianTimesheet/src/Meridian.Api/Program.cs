@@ -53,7 +53,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("Frontend", policy =>
     {
-        policy.WithOrigins("http://timesheet.carbynetech.com:8077")
+        policy.WithOrigins("http://timesheet.carbynetech.com:8077", "https://timesheet.carbynetech.com:8443")
             .AllowAnyOrigin()
             .AllowAnyHeader()
             .AllowAnyMethod();
