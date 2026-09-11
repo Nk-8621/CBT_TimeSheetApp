@@ -40,6 +40,7 @@ public class Employee
     public ICollection<Employee> DirectReports { get; set; } = new List<Employee>();
     public ICollection<EmployeeRole> EmployeeRoles { get; set; } = new List<EmployeeRole>();
     public ICollection<EmployeeDepartment> EmployeeDepartments { get; set; } = new List<EmployeeDepartment>();
+    public ICollection<EmployeeProjectAllocation> ProjectAllocations { get; set; } = new List<EmployeeProjectAllocation>();
 
 	public string? PasswordHash { get; set; }
 	public bool MustChangePassword { get; set; }

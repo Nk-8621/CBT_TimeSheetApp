@@ -1,0 +1,14 @@
+# Microsoft (Entra ID) login. Fill in the two values below yourself
+# (Application/client ID and Directory/tenant ID from the App
+# Registration) - see .env.example for the full setup steps.
+
+VITE_AZURE_CLIENT_ID=
+VITE_AZURE_TENANT_ID=
+# Left blank on purpose - the app falls back to whatever URL it's actually
+# running on (window.location.origin), so this works both locally and in
+# production without editing this file. Only set it if you need to force
+# a specific value.
+VITE_AZURE_REDIRECT_URI=
+
+# Backend API - the .NET Web API from src/Meridian.Api.
+VITE_API_BASE_URL=http://localhost:5160

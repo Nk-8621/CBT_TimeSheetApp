@@ -13,4 +13,9 @@ public interface IEmployeeRepository
 	Task SaveChangesAsync(CancellationToken ct = default);
 	Task<Employee?> GetByCodeOrEmailAsync(string identifier, CancellationToken ct = default);
 	Task AddAsync(Employee employee, CancellationToken ct = default);
+
+	// ---- Project allocation (which Projects this Employee is actually working on) ----
+	Task<IReadOnlyList<EmployeeProjectAllocation>> GetProjectAllocationsAsync(int employeeId, CancellationToken ct = default);
+	Task AddProjectAllocationAsync(EmployeeProjectAllocation allocation, CancellationToken ct = default);
+	void RemoveProjectAllocations(IEnumerable<EmployeeProjectAllocation> allocations);
 }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -13,7 +13,11 @@ namespace Meridian.Application.DTOs
 	string ManagerEmployeeCode,
 	int DepartmentId,
 	bool IsExternal,
-	string? EmployeeCode = null // required when IsExternal is false; ignored (auto-generated) when true
+	string? EmployeeCode = null, // required when IsExternal is false; ignored (auto-generated) when true
+	/// <summary>Projects to allocate this employee to right away - the same
+	/// checkbox list shown on the Add Employee form. Pass null/empty to skip
+	/// (allocations can always be added later from Edit Employee).</summary>
+	IReadOnlyList<int>? ProjectIds = null
 	);
 
 	public record SetPrimaryAccountRequest(int? AccountId);

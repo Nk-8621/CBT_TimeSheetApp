@@ -6,7 +6,7 @@ using Meridian.Domain.Entities;
 
 namespace Meridian.Application.Services;
 
-public class EmployeeService(IEmployeeRepository employeeRepository, IPasswordHasher passwordHasher) : IEmployeeService
+public class EmployeeService(IEmployeeRepository employeeRepository, IPasswordHasher passwordHasher, IMasterDataRepository masterDataRepository) : IEmployeeService
 {
 	public async Task<EmployeeDto?> GetByCodeAsync(string employeeCode, CancellationToken ct = default)
 	{
@@ -97,6 +97,14 @@ public class EmployeeService(IEmployeeRepository employeeRepository, IPasswordHa
 			employeeCode = request.EmployeeCode;
 		}
 
+		// Validate every requested project up front, before anything is
+		// written — a bad project id should fail the whole create, not leave
+		// a half-allocated employee behind.
+		var projectIds = (request.ProjectIds ?? []).Distinct().ToList();
+		foreach (var projectId in projectIds)
+			_ = await masterDataRepository.GetProjectByIdAsync(projectId, ct)
+				?? throw new EntityNotFoundException(nameof(Project), projectId);
+
 		var employee = new Employee
 		{
 			EmployeeCode = employeeCode,
@@ -115,7 +123,17 @@ public class EmployeeService(IEmployeeRepository employeeRepository, IPasswordHa
 		};
 
 		await employeeRepository.AddAsync(employee, ct);
-		await employeeRepository.SaveChangesAsync(ct);
+		await employeeRepository.SaveChangesAsync(ct); // populates employee.EmployeeId before an allocation can reference it
+
+		foreach (var projectId in projectIds)
+			await employeeRepository.AddProjectAllocationAsync(new EmployeeProjectAllocation
+			{
+				EmployeeId = employee.EmployeeId,
+				ProjectId = projectId,
+				AssignedAt = DateTime.UtcNow,
+			}, ct);
+		if (projectIds.Count > 0)
+			await employeeRepository.SaveChangesAsync(ct);
 
 		return await ToDtoAsync(employee, ct);
 	}
@@ -172,9 +190,48 @@ public class EmployeeService(IEmployeeRepository employeeRepository, IPasswordHa
 		employee.IsActive = true;
 		employee.DeactivatedAt = null;
 		employee.DeactivatedByEmployeeId = null;
-		// Deliberately NOT restoring former direct reports to this manager �
+		// Deliberately NOT restoring former direct reports to this manager —
 		// they were already reassigned; someone can manually move them back if
 		// that's actually wanted.
+		await employeeRepository.SaveChangesAsync(ct);
+	}
+
+	// ---- Project allocation ----
+
+	public async Task<IReadOnlyList<int>> GetProjectAllocationsAsync(string employeeCode, CancellationToken ct = default)
+	{
+		var employee = await employeeRepository.GetByCodeAsync(employeeCode, ct)
+			?? throw new EntityNotFoundException(nameof(Employee), employeeCode);
+
+		var allocations = await employeeRepository.GetProjectAllocationsAsync(employee.EmployeeId, ct);
+		return allocations.Select(a => a.ProjectId).ToList();
+	}
+
+	public async Task SetProjectAllocationsAsync(string employeeCode, SetEmployeeProjectAllocationsRequest request, CancellationToken ct = default)
+	{
+		var employee = await employeeRepository.GetByCodeAsync(employeeCode, ct)
+			?? throw new EntityNotFoundException(nameof(Employee), employeeCode);
+
+		var requestedIds = (request.ProjectIds ?? []).Distinct().ToList();
+		foreach (var projectId in requestedIds)
+			_ = await masterDataRepository.GetProjectByIdAsync(projectId, ct)
+				?? throw new EntityNotFoundException(nameof(Project), projectId);
+
+		var current = await employeeRepository.GetProjectAllocationsAsync(employee.EmployeeId, ct);
+		var currentIds = current.Select(a => a.ProjectId).ToHashSet();
+
+		var toRemove = current.Where(a => !requestedIds.Contains(a.ProjectId)).ToList();
+		var toAddIds = requestedIds.Where(id => !currentIds.Contains(id)).ToList();
+
+		employeeRepository.RemoveProjectAllocations(toRemove);
+		foreach (var projectId in toAddIds)
+			await employeeRepository.AddProjectAllocationAsync(new EmployeeProjectAllocation
+			{
+				EmployeeId = employee.EmployeeId,
+				ProjectId = projectId,
+				AssignedAt = DateTime.UtcNow,
+			}, ct);
+
 		await employeeRepository.SaveChangesAsync(ct);
 	}
 }

@@ -3,8 +3,9 @@ using Meridian.Domain.Entities;
 namespace Meridian.Application.Interfaces.Repositories;
 
 /// <summary>Read-only access to reference/lookup data (departments, accounts,
-/// projects, modules, tasks, holidays). This data changes rarely, so it's
-/// kept in one repository rather than five near-identical tiny ones.</summary>
+/// projects, modules, tasks, holidays, project types) plus the mutations the
+/// Master Data admin screen needs. This data changes rarely, so it's kept in
+/// one repository rather than several near-identical tiny ones.</summary>
 public interface IMasterDataRepository
 {
 	// ---- Read (all entities) ----
@@ -16,15 +17,25 @@ public interface IMasterDataRepository
 	Task<IReadOnlyList<WorkTask>> GetTasksAsync(int? moduleId = null, CancellationToken ct = default);
 	Task<IReadOnlyList<Holiday>> GetHolidaysAsync(DateOnly? from = null, DateOnly? to = null, CancellationToken ct = default);
 	Task<Holiday?> GetHolidayOnAsync(DateOnly date, int? accountId, CancellationToken ct = default);
-	Task<IReadOnlyList<TaskCategory>> GetTaskCategoriesAsync(CancellationToken ct = default);
 
-	// ---- Get by ID (needed before an update) ----
+	// ---- Project Type + its Module/Task template tree ----
+	Task<IReadOnlyList<ProjectType>> GetProjectTypesAsync(CancellationToken ct = default);
+	Task<ProjectType?> GetProjectTypeByIdAsync(int projectTypeId, CancellationToken ct = default);
+	Task<ProjectType?> GetProjectTypeWithTemplatesByIdAsync(int projectTypeId, CancellationToken ct = default);
+	Task<ProjectTypeModuleTemplate?> GetModuleTemplateByIdAsync(int moduleTemplateId, CancellationToken ct = default);
+	Task<ProjectTypeTaskTemplate?> GetTaskTemplateByIdAsync(int taskTemplateId, CancellationToken ct = default);
+
+	/// <summary>Every Project / Module currently pointing at this Project Type -
+	/// used to reassign them to a replacement type before it's deleted.</summary>
+	Task<IReadOnlyList<Project>> GetProjectsByProjectTypeIdAsync(int projectTypeId, CancellationToken ct = default);
+	Task<IReadOnlyList<Module>> GetModulesByProjectTypeIdAsync(int projectTypeId, CancellationToken ct = default);
+
+	// ---- Get by ID (tracked - needed before an update) ----
 	Task<Account?> GetAccountByIdAsync(int accountId, CancellationToken ct = default);
 	Task<Project?> GetProjectByIdAsync(int projectId, CancellationToken ct = default);
 	Task<Module?> GetModuleByIdAsync(int moduleId, CancellationToken ct = default);
 	Task<WorkTask?> GetTaskByIdAsync(int taskId, CancellationToken ct = default);
 	Task<Holiday?> GetHolidayByIdAsync(int holidayId, CancellationToken ct = default);
-	Task<TaskCategory?> GetTaskCategoryByCodeAsync(string code, CancellationToken ct = default);
 
 	// ---- Mutations ----
 	Task AddAccountAsync(Account account, CancellationToken ct = default);
@@ -33,6 +44,21 @@ public interface IMasterDataRepository
 	Task AddTaskAsync(WorkTask task, CancellationToken ct = default);
 	Task AddHolidayAsync(Holiday holiday, CancellationToken ct = default);
 	void RemoveHoliday(Holiday holiday);
+
+	Task AddProjectTypeAsync(ProjectType projectType, CancellationToken ct = default);
+	void RemoveProjectType(ProjectType projectType);
+	Task AddModuleTemplateAsync(ProjectTypeModuleTemplate template, CancellationToken ct = default);
+	void RemoveModuleTemplate(ProjectTypeModuleTemplate template);
+	Task AddTaskTemplateAsync(ProjectTypeTaskTemplate template, CancellationToken ct = default);
+	void RemoveTaskTemplate(ProjectTypeTaskTemplate template);
+
+	// ---- Project-wise resource allocation (admin reporting) ----
+	/// <summary>Every Project with its EmployeeAllocations loaded (Employee NOT
+	/// loaded) - enough to compute a headcount per project.</summary>
+	Task<IReadOnlyList<Project>> GetProjectsWithAllocationsAsync(CancellationToken ct = default);
+	/// <summary>One Project with its EmployeeAllocations AND each allocated
+	/// Employee's Department loaded - backs the "who's on this project" drill-down.</summary>
+	Task<Project?> GetProjectWithAllocationsByIdAsync(int projectId, CancellationToken ct = default);
 
 	Task SaveChangesAsync(CancellationToken ct = default);
 }

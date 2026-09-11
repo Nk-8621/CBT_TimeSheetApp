@@ -12,24 +12,78 @@ public class ProjectConfiguration : IEntityTypeConfiguration<Project>
         builder.HasKey(p => p.ProjectId);
         builder.Property(p => p.Code).HasMaxLength(20).IsRequired();
         builder.Property(p => p.Name).HasMaxLength(200).IsRequired();
+        builder.Property(p => p.ProjectTech).HasMaxLength(200);
+        builder.Property(p => p.BillingType).HasMaxLength(30);
+        builder.Property(p => p.CustomerPO).HasMaxLength(100);
+        builder.Property(p => p.Notes).HasMaxLength(2000);
         builder.HasIndex(p => p.Code).IsUnique();
 
         builder.HasOne(p => p.Account)
             .WithMany(a => a.Projects)
             .HasForeignKey(p => p.AccountId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(p => p.ProjectType)
+            .WithMany()
+            .HasForeignKey(p => p.ProjectTypeId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasOne(p => p.ProjectLeadEmployee)
+            .WithMany()
+            .HasForeignKey(p => p.ProjectLeadEmployeeId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(p => p.ProjectManagerEmployee)
+            .WithMany()
+            .HasForeignKey(p => p.ProjectManagerEmployeeId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(p => p.DeliveryHeadEmployee)
+            .WithMany()
+            .HasForeignKey(p => p.DeliveryHeadEmployeeId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }
 
-public class TaskCategoryConfiguration : IEntityTypeConfiguration<TaskCategory>
+public class ProjectTypeConfiguration : IEntityTypeConfiguration<ProjectType>
 {
-    public void Configure(EntityTypeBuilder<TaskCategory> builder)
+    public void Configure(EntityTypeBuilder<ProjectType> builder)
     {
-        builder.ToTable("Carbynetech_TaskCategory");
-        builder.HasKey(t => t.TaskCategoryId);
+        builder.ToTable("Carbynetech_ProjectType");
+        builder.HasKey(t => t.ProjectTypeId);
         builder.Property(t => t.Code).HasMaxLength(20).IsRequired();
         builder.Property(t => t.Name).HasMaxLength(100).IsRequired();
         builder.HasIndex(t => t.Code).IsUnique();
+    }
+}
+
+public class ProjectTypeModuleTemplateConfiguration : IEntityTypeConfiguration<ProjectTypeModuleTemplate>
+{
+    public void Configure(EntityTypeBuilder<ProjectTypeModuleTemplate> builder)
+    {
+        builder.ToTable("Carbynetech_ProjectTypeModuleTemplate");
+        builder.HasKey(m => m.ProjectTypeModuleTemplateId);
+        builder.Property(m => m.Name).HasMaxLength(150).IsRequired();
+
+        builder.HasOne(m => m.ProjectType)
+            .WithMany(t => t.ModuleTemplates)
+            .HasForeignKey(m => m.ProjectTypeId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+public class ProjectTypeTaskTemplateConfiguration : IEntityTypeConfiguration<ProjectTypeTaskTemplate>
+{
+    public void Configure(EntityTypeBuilder<ProjectTypeTaskTemplate> builder)
+    {
+        builder.ToTable("Carbynetech_ProjectTypeTaskTemplate");
+        builder.HasKey(t => t.ProjectTypeTaskTemplateId);
+        builder.Property(t => t.Name).HasMaxLength(150).IsRequired();
+
+        builder.HasOne(t => t.ModuleTemplate)
+            .WithMany(m => m.TaskTemplates)
+            .HasForeignKey(t => t.ProjectTypeModuleTemplateId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }
 
@@ -47,10 +101,10 @@ public class ModuleConfiguration : IEntityTypeConfiguration<Module>
             .HasForeignKey(m => m.ProjectId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasOne(m => m.TaskCategory)
+        builder.HasOne(m => m.ProjectType)
             .WithMany()
-            .HasForeignKey(m => m.TaskCategoryId)
-            .OnDelete(DeleteBehavior.Restrict);
+            .HasForeignKey(m => m.ProjectTypeId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }
 

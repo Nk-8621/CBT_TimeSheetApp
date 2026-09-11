@@ -11,6 +11,26 @@ public class Project
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
 
+    public int? ProjectTypeId { get; set; }
+    public string? ProjectTech { get; set; }
+    public string? BillingType { get; set; }
+    public string? CustomerPO { get; set; }
+    public string? Notes { get; set; }
+
+    /// <summary>True for a project created via the "Others" self-service
+    /// quick-add path (pending an admin classifying it properly) rather
+    /// than through the full admin Add Project form.</summary>
+    public bool NeedsReview { get; set; }
+
+    public int? ProjectLeadEmployeeId { get; set; }
+    public int? ProjectManagerEmployeeId { get; set; }
+    public int? DeliveryHeadEmployeeId { get; set; }
+
     public Account? Account { get; set; }
+    public ProjectType? ProjectType { get; set; }
+    public Employee? ProjectLeadEmployee { get; set; }
+    public Employee? ProjectManagerEmployee { get; set; }
+    public Employee? DeliveryHeadEmployee { get; set; }
     public ICollection<Module> Modules { get; set; } = new List<Module>();
+    public ICollection<EmployeeProjectAllocation> EmployeeAllocations { get; set; } = new List<EmployeeProjectAllocation>();
 }

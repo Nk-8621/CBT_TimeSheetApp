@@ -36,4 +36,15 @@ public class EmployeeRepository(MeridianDbContext db) : IEmployeeRepository
 
 	public async Task AddAsync(Employee employee, CancellationToken ct = default) =>
 	await db.Employees.AddAsync(employee, ct);
+
+	// ---- Project allocation ----
+
+	public async Task<IReadOnlyList<EmployeeProjectAllocation>> GetProjectAllocationsAsync(int employeeId, CancellationToken ct = default) =>
+	await db.EmployeeProjectAllocations.Where(a => a.EmployeeId == employeeId).ToListAsync(ct);
+
+	public async Task AddProjectAllocationAsync(EmployeeProjectAllocation allocation, CancellationToken ct = default) =>
+	await db.EmployeeProjectAllocations.AddAsync(allocation, ct);
+
+	public void RemoveProjectAllocations(IEnumerable<EmployeeProjectAllocation> allocations) =>
+	db.EmployeeProjectAllocations.RemoveRange(allocations);
 }
