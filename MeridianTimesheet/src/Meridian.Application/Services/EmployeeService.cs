@@ -6,7 +6,7 @@ using Meridian.Domain.Entities;
 
 namespace Meridian.Application.Services;
 
-public class EmployeeService(IEmployeeRepository employeeRepository) : IEmployeeService
+public class EmployeeService(IEmployeeRepository employeeRepository, IMasterDataRepository masterDataRepository) : IEmployeeService
 {
 	public async Task<EmployeeDto?> GetByCodeAsync(string employeeCode, CancellationToken ct = default)
 	{
