@@ -6,7 +6,7 @@ using Meridian.Domain.Entities;
 
 namespace Meridian.Application.Services;
 
-public class EmployeeService(IEmployeeRepository employeeRepository, IPasswordHasher passwordHasher, IMasterDataRepository masterDataRepository) : IEmployeeService
+public class EmployeeService(IEmployeeRepository employeeRepository) : IEmployeeService
 {
 	public async Task<EmployeeDto?> GetByCodeAsync(string employeeCode, CancellationToken ct = default)
 	{
@@ -98,7 +98,7 @@ public class EmployeeService(IEmployeeRepository employeeRepository, IPasswordHa
 		}
 
 		// Validate every requested project up front, before anything is
-		// written — a bad project id should fail the whole create, not leave
+		// written � a bad project id should fail the whole create, not leave
 		// a half-allocated employee behind.
 		var projectIds = (request.ProjectIds ?? []).Distinct().ToList();
 		foreach (var projectId in projectIds)
@@ -117,8 +117,6 @@ public class EmployeeService(IEmployeeRepository employeeRepository, IPasswordHa
 			LocationId = manager.LocationId, // new employees default to their manager's location; there's no location picker on the create form
 			ManagerEmployeeId = manager.EmployeeId,
 			IsExternal = request.IsExternal,
-			PasswordHash = passwordHasher.Hash("cbt@2026"),
-			MustChangePassword = true,
 			LoginAccessGrantedAt = DateTime.UtcNow,
 		};
 
@@ -190,7 +188,7 @@ public class EmployeeService(IEmployeeRepository employeeRepository, IPasswordHa
 		employee.IsActive = true;
 		employee.DeactivatedAt = null;
 		employee.DeactivatedByEmployeeId = null;
-		// Deliberately NOT restoring former direct reports to this manager —
+		// Deliberately NOT restoring former direct reports to this manager �
 		// they were already reassigned; someone can manually move them back if
 		// that's actually wanted.
 		await employeeRepository.SaveChangesAsync(ct);

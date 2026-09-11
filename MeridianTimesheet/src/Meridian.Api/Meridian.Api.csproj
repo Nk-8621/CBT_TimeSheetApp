@@ -11,9 +11,7 @@
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.20" />
     <PackageReference Include="NETCore.MailKit" Version="2.1.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
-    <!-- Re-enable once real Microsoft Entra login is wired up (see the
-         commented-out branch in Program.cs). Not needed for dev-mode auth. -->
-    <!-- <PackageReference Include="Microsoft.Identity.Web" Version="3.5.0" /> -->
+    <PackageReference Include="Microsoft.Identity.Web" Version="3.5.0" />
   </ItemGroup>
 
   <ItemGroup>
