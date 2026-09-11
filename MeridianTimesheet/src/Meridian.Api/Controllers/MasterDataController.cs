@@ -7,9 +7,11 @@ namespace Meridian.Api.Controllers;
 
 /// <summary>Reference data for the frontend's dropdowns/filters (open to any
 /// authenticated user) plus the Master Data admin screen's mutations
-/// (Accounts/Projects/Modules/Tasks/Holidays/Project Types - Admin role only).
-/// Departments/Locations stay read-only everywhere: they're sourced from
-/// the real org chart, not something this application should hand-edit.</summary>
+/// (Accounts/Projects/Modules/Tasks/Holidays/Project Types - Admin role
+/// only). The "Others" quick-add endpoints are the one exception - any
+/// authenticated employee can call those from Add Task Line, not just
+/// admins. Departments/Locations stay read-only everywhere: they're sourced
+/// from the real org chart, not something this application should hand-edit.</summary>
 [ApiController]
 [Route("api/masterdata")]
 [Authorize]
@@ -48,6 +50,13 @@ public class MasterDataController(IMasterDataService masterDataService, ICurrent
 	[HttpGet("project-types")]
 	public async Task<IActionResult> GetProjectTypes(CancellationToken ct) =>
 		Ok(await masterDataService.GetProjectTypesAsync(ct));
+
+	[HttpGet("project-types/with-templates")]
+	public async Task<IActionResult> GetProjectTypesWithTemplates(CancellationToken ct)
+	{
+		if (!currentUser.IsAdmin) return Forbid();
+		return Ok(await masterDataService.GetProjectTypesWithTemplatesAsync(ct));
+	}
 
 	[HttpGet("project-types/{projectTypeId:int}/template")]
 	public async Task<IActionResult> GetProjectTypeWithTemplate(int projectTypeId, CancellationToken ct) =>
@@ -169,74 +178,6 @@ public class MasterDataController(IMasterDataService masterDataService, ICurrent
 	{
 		if (!currentUser.IsAdmin) return Forbid();
 		await masterDataService.DeleteHolidayAsync(holidayId, ct);
-		return NoContent();
-	}
-
-	// ---- Project Type CRUD (Admin only) ----
-
-	[HttpPost("project-types")]
-	public async Task<IActionResult> CreateProjectType([FromBody] CreateProjectTypeRequest request, CancellationToken ct)
-	{
-		if (!currentUser.IsAdmin) return Forbid();
-		return Ok(await masterDataService.CreateProjectTypeAsync(request, ct));
-	}
-
-	[HttpPut("project-types/{projectTypeId:int}")]
-	public async Task<IActionResult> UpdateProjectType(int projectTypeId, [FromBody] UpdateProjectTypeRequest request, CancellationToken ct)
-	{
-		if (!currentUser.IsAdmin) return Forbid();
-		return Ok(await masterDataService.UpdateProjectTypeAsync(projectTypeId, request, ct));
-	}
-
-	[HttpDelete("project-types/{projectTypeId:int}")]
-	public async Task<IActionResult> DeleteProjectType(int projectTypeId, [FromBody] DeleteProjectTypeRequest request, CancellationToken ct)
-	{
-		if (!currentUser.IsAdmin) return Forbid();
-		await masterDataService.DeleteProjectTypeAsync(projectTypeId, request, ct);
-		return NoContent();
-	}
-
-	[HttpPost("project-types/module-templates")]
-	public async Task<IActionResult> CreateModuleTemplate([FromBody] CreateProjectTypeModuleTemplateRequest request, CancellationToken ct)
-	{
-		if (!currentUser.IsAdmin) return Forbid();
-		return Ok(await masterDataService.CreateModuleTemplateAsync(request, ct));
-	}
-
-	[HttpPut("project-types/module-templates/{moduleTemplateId:int}")]
-	public async Task<IActionResult> UpdateModuleTemplate(int moduleTemplateId, [FromBody] UpdateProjectTypeModuleTemplateRequest request, CancellationToken ct)
-	{
-		if (!currentUser.IsAdmin) return Forbid();
-		return Ok(await masterDataService.UpdateModuleTemplateAsync(moduleTemplateId, request, ct));
-	}
-
-	[HttpDelete("project-types/module-templates/{moduleTemplateId:int}")]
-	public async Task<IActionResult> DeleteModuleTemplate(int moduleTemplateId, CancellationToken ct)
-	{
-		if (!currentUser.IsAdmin) return Forbid();
-		await masterDataService.DeleteModuleTemplateAsync(moduleTemplateId, ct);
-		return NoContent();
-	}
-
-	[HttpPost("project-types/task-templates")]
-	public async Task<IActionResult> CreateTaskTemplate([FromBody] CreateProjectTypeTaskTemplateRequest request, CancellationToken ct)
-	{
-		if (!currentUser.IsAdmin) return Forbid();
-		return Ok(await masterDataService.CreateTaskTemplateAsync(request, ct));
-	}
-
-	[HttpPut("project-types/task-templates/{taskTemplateId:int}")]
-	public async Task<IActionResult> UpdateTaskTemplate(int taskTemplateId, [FromBody] UpdateProjectTypeTaskTemplateRequest request, CancellationToken ct)
-	{
-		if (!currentUser.IsAdmin) return Forbid();
-		return Ok(await masterDataService.UpdateTaskTemplateAsync(taskTemplateId, request, ct));
-	}
-
-	[HttpDelete("project-types/task-templates/{taskTemplateId:int}")]
-	public async Task<IActionResult> DeleteTaskTemplate(int taskTemplateId, CancellationToken ct)
-	{
-		if (!currentUser.IsAdmin) return Forbid();
-		await masterDataService.DeleteTaskTemplateAsync(taskTemplateId, ct);
 		return NoContent();
 	}
 }

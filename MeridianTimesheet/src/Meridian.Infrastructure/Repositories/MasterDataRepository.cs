@@ -16,7 +16,7 @@ public class MasterDataRepository(MeridianDbContext db) : IMasterDataRepository
 	public async Task<IReadOnlyList<Account>> GetAccountsAsync(CancellationToken ct = default) =>
 		await db.Accounts.AsNoTracking().ToListAsync(ct);
 
-	// Returns ALL projects, active or not - the Master Data admin screen needs
+	// Returns ALL projects, active or not – the Master Data admin screen needs
 	// to see inactive projects too (otherwise deactivating one is a one-way
 	// trip with no way to ever see or reactivate it again). Screens that log
 	// NEW time (e.g. the Add Task Line dropdown) filter to active-only
@@ -54,7 +54,14 @@ public class MasterDataRepository(MeridianDbContext db) : IMasterDataRepository
 	public Task<Holiday?> GetHolidayOnAsync(DateOnly date, int? accountId, CancellationToken ct = default) =>
 	db.Holidays.FirstOrDefaultAsync(h => h.HolidayDate == date && (h.AccountId == null || h.AccountId == accountId), ct);
 
-	// ---- Project Type + templates ----
+	public async Task<IReadOnlyList<ProjectType>> GetProjectTypesAsync(CancellationToken ct = default) =>
+		await db.ProjectTypes.AsNoTracking().ToListAsync(ct);
+
+	public async Task<IReadOnlyList<ProjectType>> GetProjectTypesWithTemplatesAsync(CancellationToken ct = default) =>
+		await db.ProjectTypes.AsNoTracking()
+			.Include(t => t.ModuleTemplates.OrderBy(m => m.SortOrder))
+				.ThenInclude(m => m.TaskTemplates.OrderBy(x => x.SortOrder))
+			.ToListAsync(ct);
 
 	public async Task<IReadOnlyList<ProjectType>> GetProjectTypesAsync(CancellationToken ct = default) =>
 		await db.ProjectTypes.AsNoTracking().ToListAsync(ct);
@@ -85,6 +92,9 @@ public class MasterDataRepository(MeridianDbContext db) : IMasterDataRepository
 	public Task<Account?> GetAccountByIdAsync(int accountId, CancellationToken ct = default) =>
 		db.Accounts.FirstOrDefaultAsync(a => a.AccountId == accountId, ct);
 
+	public Task<Account?> GetAccountByNameAsync(string name, CancellationToken ct = default) =>
+		db.Accounts.FirstOrDefaultAsync(a => a.Name == name, ct);
+
 	public Task<Project?> GetProjectByIdAsync(int projectId, CancellationToken ct = default) =>
 		db.Projects
 			.Include(p => p.ProjectType)
@@ -101,6 +111,27 @@ public class MasterDataRepository(MeridianDbContext db) : IMasterDataRepository
 
 	public Task<Holiday?> GetHolidayByIdAsync(int holidayId, CancellationToken ct = default) =>
 		db.Holidays.FirstOrDefaultAsync(h => h.HolidayId == holidayId, ct);
+
+	public Task<ProjectType?> GetProjectTypeByCodeAsync(string code, CancellationToken ct = default) =>
+		db.ProjectTypes.FirstOrDefaultAsync(c => c.Code == code, ct);
+
+	public Task<ProjectType?> GetProjectTypeByIdAsync(int projectTypeId, CancellationToken ct = default) =>
+		db.ProjectTypes.FirstOrDefaultAsync(c => c.ProjectTypeId == projectTypeId, ct);
+
+	public Task<ProjectType?> GetProjectTypeWithTemplatesByIdAsync(int projectTypeId, CancellationToken ct = default) =>
+		db.ProjectTypes
+			.Include(t => t.ModuleTemplates.OrderBy(m => m.SortOrder))
+				.ThenInclude(m => m.TaskTemplates.OrderBy(x => x.SortOrder))
+			.FirstOrDefaultAsync(c => c.ProjectTypeId == projectTypeId, ct);
+
+	public Task<ProjectTypeModuleTemplate?> GetModuleTemplateByIdAsync(int id, CancellationToken ct = default) =>
+		db.ProjectTypeModuleTemplates.FirstOrDefaultAsync(m => m.ProjectTypeModuleTemplateId == id, ct);
+
+	public Task<ProjectTypeTaskTemplate?> GetTaskTemplateByIdAsync(int id, CancellationToken ct = default) =>
+		db.ProjectTypeTaskTemplates.FirstOrDefaultAsync(t => t.ProjectTypeTaskTemplateId == id, ct);
+
+	public async Task<IReadOnlyList<Project>> GetProjectsByProjectTypeIdAsync(int projectTypeId, CancellationToken ct = default) =>
+		await db.Projects.Where(p => p.ProjectTypeId == projectTypeId).ToListAsync(ct);
 
 	// ---- Mutations ----
 	public async Task AddAccountAsync(Account account, CancellationToken ct = default) =>
