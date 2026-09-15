@@ -27,24 +27,9 @@ public class Project
     public string? CustomerPO { get; set; }
     public string? Notes { get; set; }
 
-    public int? ProjectLeadEmployeeId { get; set; }
-    public int? ProjectManagerEmployeeId { get; set; }
-    public int? DeliveryHeadEmployeeId { get; set; }
-
     /// <summary>True for a project auto-created on the fly via the "Others"
     /// quick-add flow (Add Task Line) - missing a real Account/Code/BillingType
     /// until admin reviews and fills them in on the Master Data screen.</summary>
-    public bool NeedsReview { get; set; }
-
-    public int? ProjectTypeId { get; set; }
-    public string? ProjectTech { get; set; }
-    public string? BillingType { get; set; }
-    public string? CustomerPO { get; set; }
-    public string? Notes { get; set; }
-
-    /// <summary>True for a project created via the "Others" self-service
-    /// quick-add path (pending an admin classifying it properly) rather
-    /// than through the full admin Add Project form.</summary>
     public bool NeedsReview { get; set; }
 
     public int? ProjectLeadEmployeeId { get; set; }

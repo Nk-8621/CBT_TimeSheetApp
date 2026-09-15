@@ -14,44 +14,24 @@ public class ProjectConfiguration : IEntityTypeConfiguration<Project>
         builder.Property(p => p.Name).HasMaxLength(200).IsRequired();
         builder.Property(p => p.ProjectTech).HasMaxLength(200);
         builder.Property(p => p.BillingType).HasMaxLength(30);
-        builder.Property(p => p.CustomerPO).HasMaxLength(100);
+        builder.Property(p => p.CustomerPO).HasMaxLength(200);
         builder.Property(p => p.Notes).HasMaxLength(2000);
         builder.HasIndex(p => p.Code).IsUnique();
-
-        builder.Property(p => p.ProjectTech).HasMaxLength(100);
-        builder.Property(p => p.BillingType).HasMaxLength(30);
-        builder.Property(p => p.CustomerPO).HasMaxLength(200);
-        builder.Property(p => p.Notes).HasMaxLength(1000);
 
         builder.HasOne(p => p.Account)
             .WithMany(a => a.Projects)
             .HasForeignKey(p => p.AccountId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // SetNull, not Restrict - same reasoning as Module.ProjectType below:
+        // DeleteProjectTypeAsync always reassigns referencing Projects or
+        // blocks the delete in the application layer before this FK is ever
+        // exercised, but SetNull keeps that a defensive default rather than
+        // a hard DB dependency on the app always getting there first.
         builder.HasOne(p => p.ProjectType)
             .WithMany()
             .HasForeignKey(p => p.ProjectTypeId)
             .OnDelete(DeleteBehavior.SetNull);
-
-        builder.HasOne(p => p.ProjectLeadEmployee)
-            .WithMany()
-            .HasForeignKey(p => p.ProjectLeadEmployeeId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasOne(p => p.ProjectManagerEmployee)
-            .WithMany()
-            .HasForeignKey(p => p.ProjectManagerEmployeeId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasOne(p => p.DeliveryHeadEmployee)
-            .WithMany()
-            .HasForeignKey(p => p.DeliveryHeadEmployeeId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasOne(p => p.ProjectType)
-            .WithMany()
-            .HasForeignKey(p => p.ProjectTypeId)
-            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne(p => p.ProjectLeadEmployee)
             .WithMany()
@@ -133,7 +113,6 @@ public class ModuleConfiguration : IEntityTypeConfiguration<Module>
         // timesheet grid. Letting it null out means deleting a ProjectType
         // never gets blocked by Modules it previously generated, on top of
         // the explicit Project-level reassignment in DeleteProjectTypeAsync.
-        builder.HasOne(m => m.ProjectType)
         builder.HasOne(m => m.ProjectType)
             .WithMany()
             .HasForeignKey(m => m.ProjectTypeId)

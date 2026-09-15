@@ -19,7 +19,12 @@ public interface IMasterDataRepository
 
 	// ---- Project Type + its Module/Task template tree ----
 	Task<IReadOnlyList<ProjectType>> GetProjectTypesAsync(CancellationToken ct = default);
+	/// <summary>Every Project Type with its full Module/Task template tree
+	/// loaded - backs the admin template-management screen's "all types at
+	/// once" view.</summary>
+	Task<IReadOnlyList<ProjectType>> GetProjectTypesWithTemplatesAsync(CancellationToken ct = default);
 	Task<ProjectType?> GetProjectTypeByIdAsync(int projectTypeId, CancellationToken ct = default);
+	Task<ProjectType?> GetProjectTypeByCodeAsync(string code, CancellationToken ct = default);
 	Task<ProjectType?> GetProjectTypeWithTemplatesByIdAsync(int projectTypeId, CancellationToken ct = default);
 	Task<ProjectTypeModuleTemplate?> GetModuleTemplateByIdAsync(int moduleTemplateId, CancellationToken ct = default);
 	Task<ProjectTypeTaskTemplate?> GetTaskTemplateByIdAsync(int taskTemplateId, CancellationToken ct = default);
@@ -36,12 +41,6 @@ public interface IMasterDataRepository
 	Task<Module?> GetModuleByIdAsync(int moduleId, CancellationToken ct = default);
 	Task<WorkTask?> GetTaskByIdAsync(int taskId, CancellationToken ct = default);
 	Task<Holiday?> GetHolidayByIdAsync(int holidayId, CancellationToken ct = default);
-	Task<ProjectType?> GetProjectTypeByCodeAsync(string code, CancellationToken ct = default);
-	Task<ProjectType?> GetProjectTypeByIdAsync(int projectTypeId, CancellationToken ct = default);
-	Task<ProjectType?> GetProjectTypeWithTemplatesByIdAsync(int projectTypeId, CancellationToken ct = default);
-	Task<ProjectTypeModuleTemplate?> GetModuleTemplateByIdAsync(int id, CancellationToken ct = default);
-	Task<ProjectTypeTaskTemplate?> GetTaskTemplateByIdAsync(int id, CancellationToken ct = default);
-	Task<IReadOnlyList<Project>> GetProjectsByProjectTypeIdAsync(int projectTypeId, CancellationToken ct = default);
 
 	// ---- Mutations ----
 	Task AddAccountAsync(Account account, CancellationToken ct = default);
@@ -50,13 +49,6 @@ public interface IMasterDataRepository
 	Task AddTaskAsync(WorkTask task, CancellationToken ct = default);
 	Task AddHolidayAsync(Holiday holiday, CancellationToken ct = default);
 	void RemoveHoliday(Holiday holiday);
-	Task AddProjectTypeAsync(ProjectType projectType, CancellationToken ct = default);
-	void RemoveProjectType(ProjectType projectType);
-	Task AddModuleTemplateAsync(ProjectTypeModuleTemplate template, CancellationToken ct = default);
-	void RemoveModuleTemplate(ProjectTypeModuleTemplate template);
-	Task AddTaskTemplateAsync(ProjectTypeTaskTemplate template, CancellationToken ct = default);
-	void RemoveTaskTemplate(ProjectTypeTaskTemplate template);
-
 	Task AddProjectTypeAsync(ProjectType projectType, CancellationToken ct = default);
 	void RemoveProjectType(ProjectType projectType);
 	Task AddModuleTemplateAsync(ProjectTypeModuleTemplate template, CancellationToken ct = default);

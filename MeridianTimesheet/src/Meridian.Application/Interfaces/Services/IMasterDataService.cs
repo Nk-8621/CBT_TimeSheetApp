@@ -14,6 +14,9 @@ public interface IMasterDataService
 
 	// ---- Project Type + its Module/Task template tree ----
 	Task<IReadOnlyList<ProjectTypeDto>> GetProjectTypesAsync(CancellationToken ct = default);
+	/// <summary>Admin-only - the full Level-1/Level-2 template tree for every
+	/// Project Type at once, for the template-management screen.</summary>
+	Task<IReadOnlyList<ProjectTypeWithTemplateDto>> GetProjectTypesWithTemplatesAsync(CancellationToken ct = default);
 	Task<ProjectTypeWithTemplateDto> GetProjectTypeWithTemplateAsync(int projectTypeId, CancellationToken ct = default);
 	Task<ProjectTypeDto> CreateProjectTypeAsync(CreateProjectTypeRequest request, CancellationToken ct = default);
 	Task<ProjectTypeDto> UpdateProjectTypeAsync(int projectTypeId, UpdateProjectTypeRequest request, CancellationToken ct = default);
@@ -38,6 +41,11 @@ public interface IMasterDataService
 	/// being immediately usable. Pass null to skip (an empty project with no
 	/// modules yet).</summary>
 	Task<ProjectDto> CreateProjectAsync(CreateProjectRequest request, CancellationToken ct = default);
+	/// <summary>ProjectTypeId in the request is retroactive-classification-only -
+	/// applied ONLY when the project currently has none. The moment that
+	/// happens, its Modules/Tasks are auto-populated from the type's
+	/// template (merge-only - see SyncProjectModulesFromTemplateAsync). Once
+	/// a project has a ProjectTypeId, this can no longer change it.</summary>
 	Task<ProjectDto> UpdateProjectAsync(int projectId, UpdateProjectRequest request, CancellationToken ct = default);
 
 	/// <summary>Explicit re-sync for a project that already has a Project Type
@@ -64,24 +72,6 @@ public interface IMasterDataService
 	Task<HolidayDto> CreateHolidayAsync(CreateHolidayRequest request, CancellationToken ct = default);
 	Task<HolidayDto> UpdateHolidayAsync(int holidayId, UpdateHolidayRequest request, CancellationToken ct = default);
 	Task DeleteHolidayAsync(int holidayId, CancellationToken ct = default);
-
-	// ---- Project Type template management (Admin only) ----
-	Task<ProjectTypeDto> CreateProjectTypeAsync(CreateProjectTypeRequest request, CancellationToken ct = default);
-	Task<ProjectTypeDto> UpdateProjectTypeAsync(int projectTypeId, UpdateProjectTypeRequest request, CancellationToken ct = default);
-	/// <summary>Requires ReplacementProjectTypeId whenever any Project still
-	/// references projectTypeId - reassigns them all first, then deletes.</summary>
-	Task DeleteProjectTypeAsync(int projectTypeId, DeleteProjectTypeRequest request, CancellationToken ct = default);
-	Task<ProjectTypeModuleTemplateDto> CreateModuleTemplateAsync(CreateProjectTypeModuleTemplateRequest request, CancellationToken ct = default);
-	Task<ProjectTypeModuleTemplateDto> UpdateModuleTemplateAsync(int id, UpdateProjectTypeModuleTemplateRequest request, CancellationToken ct = default);
-	Task DeleteModuleTemplateAsync(int id, CancellationToken ct = default);
-	Task<ProjectTypeTaskTemplateDto> CreateTaskTemplateAsync(CreateProjectTypeTaskTemplateRequest request, CancellationToken ct = default);
-	Task<ProjectTypeTaskTemplateDto> UpdateTaskTemplateAsync(int id, UpdateProjectTypeTaskTemplateRequest request, CancellationToken ct = default);
-	Task DeleteTaskTemplateAsync(int id, CancellationToken ct = default);
-
-	// ---- "Others" quick-add (employee-reachable, not admin-only) ----
-	Task<ProjectDto> QuickAddProjectAsync(QuickAddProjectRequest request, CancellationToken ct = default);
-	Task<ModuleDto> QuickAddModuleAsync(QuickAddModuleRequest request, CancellationToken ct = default);
-	Task<WorkTaskDto> QuickAddTaskAsync(QuickAddTaskRequest request, CancellationToken ct = default);
 
 	// ---- Project-wise resource allocation (admin reporting) ----
 	Task<IReadOnlyList<ProjectResourceAllocationDto>> GetProjectResourceAllocationsAsync(CancellationToken ct = default);

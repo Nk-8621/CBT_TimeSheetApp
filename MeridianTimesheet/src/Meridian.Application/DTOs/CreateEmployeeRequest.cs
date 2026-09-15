@@ -21,4 +21,11 @@ namespace Meridian.Application.DTOs
 	);
 
 	public record SetPrimaryAccountRequest(int? AccountId);
+
+	/// <summary>Replaces an employee's full set of Project allocations in one
+	/// call - IEmployeeService.SetProjectAllocationsAsync adds whatever's newly
+	/// listed here and removes whatever's no longer listed. Backs the "Projects"
+	/// editor on the Master Data Resources tab (EmployeeAllocationsDrawer on the
+	/// frontend).</summary>
+	public record SetEmployeeProjectAllocationsRequest(IReadOnlyList<int> ProjectIds);
 }
