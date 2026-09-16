@@ -505,6 +505,8 @@ public class MasterDataService(IMasterDataRepository repository) : IMasterDataSe
 		if (request.AccountId is int accId)
 			_ = await repository.GetAccountByIdAsync(accId, ct) ?? throw new EntityNotFoundException(nameof(Account), accId);
 
+		await RequireNoDuplicateHolidayAsync(request.HolidayDate, request.Location, request.AccountId, excludeHolidayId: null, ct);
+
 		var holiday = new Holiday
 		{
 			HolidayDate = request.HolidayDate,
@@ -525,20 +527,46 @@ public class MasterDataService(IMasterDataRepository repository) : IMasterDataSe
 		var holiday = await repository.GetHolidayByIdAsync(holidayId, ct)
 			?? throw new EntityNotFoundException(nameof(Holiday), holidayId);
 
-		if (request.HolidayDate is DateOnly date) holiday.HolidayDate = date;
-		if (request.Name is not null) holiday.Name = request.Name;
-		if (request.Location is not null) holiday.Location = request.Location;
+		var newDate = request.HolidayDate ?? holiday.HolidayDate;
+		var newLocation = request.Location ?? holiday.Location;
+		var newAccountId = request.AccountId ?? holiday.AccountId;
 
 		if (request.AccountId is int accId)
-		{
 			_ = await repository.GetAccountByIdAsync(accId, ct) ?? throw new EntityNotFoundException(nameof(Account), accId);
-			holiday.AccountId = accId;
-		}
+
+		await RequireNoDuplicateHolidayAsync(newDate, newLocation, newAccountId, excludeHolidayId: holidayId, ct);
+
+		holiday.HolidayDate = newDate;
+		if (request.Name is not null) holiday.Name = request.Name;
+		holiday.Location = newLocation;
+		holiday.AccountId = newAccountId;
 		holiday.SourceSystem = "Manual"; // no longer purely KEKA-sourced once hand-edited
 		holiday.SyncedAt = DateTime.UtcNow;
 
 		await repository.SaveChangesAsync(ct);
 		return ToDto(holiday);
+	}
+
+	/// <summary>Mirrors the DB's unique (HolidayDate, Location, AccountId)
+	/// index (see HolidayConfiguration) as a friendly pre-check, so a real
+	/// collision surfaces as a clear 400 instead of a raw SQL error. A
+	/// company-wide holiday (AccountId null) and any number of client-specific
+	/// ones are allowed to coexist on the same date/location - only an exact
+	/// (date, location, client) repeat - including two company-wide entries -
+	/// is rejected, same as the index enforces.</summary>
+	private async Task RequireNoDuplicateHolidayAsync(DateOnly date, string location, int? accountId, int? excludeHolidayId, CancellationToken ct)
+	{
+		var sameDay = await repository.GetHolidaysAsync(from: date, to: date, ct: ct);
+		var clash = sameDay.Any(h =>
+			h.HolidayId != excludeHolidayId
+			&& h.AccountId == accountId
+			&& string.Equals(h.Location, location, StringComparison.OrdinalIgnoreCase));
+
+		if (clash)
+		{
+			var scope = accountId is int ? "this client" : "all clients";
+			throw new BusinessRuleException($"A holiday already exists for {location} on {date:yyyy-MM-dd} scoped to {scope}.");
+		}
 	}
 
 	public async Task DeleteHolidayAsync(int holidayId, CancellationToken ct = default)
