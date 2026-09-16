@@ -391,6 +391,8 @@ public class MasterDataService(IMasterDataRepository repository) : IMasterDataSe
 			projectType = await repository.GetProjectTypeByIdAsync(typeId, ct)
 				?? throw new EntityNotFoundException(nameof(ProjectType), typeId);
 
+		await RequireNoDuplicateModuleNameAsync(request.ProjectId, request.Name, excludeModuleId: null, ct: ct);
+
 		var module = new Module { Name = request.Name, ProjectId = request.ProjectId, ProjectTypeId = request.ProjectTypeId, CreatedAt = DateTime.UtcNow };
 		await repository.AddModuleAsync(module, ct);
 		await repository.SaveChangesAsync(ct);
@@ -402,7 +404,11 @@ public class MasterDataService(IMasterDataRepository repository) : IMasterDataSe
 		var module = await repository.GetModuleByIdAsync(moduleId, ct)
 			?? throw new EntityNotFoundException(nameof(Module), moduleId);
 
-		if (request.Name is not null) module.Name = request.Name;
+		if (request.Name is not null)
+		{
+			await RequireNoDuplicateModuleNameAsync(module.ProjectId, request.Name, excludeModuleId: moduleId, ct: ct);
+			module.Name = request.Name;
+		}
 
 		var projectType = module.ProjectType;
 		if (request.ProjectTypeId is int typeId)
@@ -416,6 +422,21 @@ public class MasterDataService(IMasterDataRepository repository) : IMasterDataSe
 		return new ModuleDto(module.ModuleId, module.ProjectId, module.Name, module.ProjectTypeId, projectType?.Code);
 	}
 
+	/// <summary>Mirrors the DB's unique (ProjectId, Name) index (see
+	/// ModuleConfiguration) as a friendly pre-check, so a duplicate module
+	/// name under the same project surfaces as a clear 400 instead of a raw
+	/// SQL error.</summary>
+	private async Task RequireNoDuplicateModuleNameAsync(int projectId, string name, int? excludeModuleId, CancellationToken ct)
+	{
+		var existing = await repository.GetModulesAsync(projectId, ct);
+		var clash = existing.Any(m =>
+			m.ModuleId != excludeModuleId
+			&& string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase));
+
+		if (clash)
+			throw new BusinessRuleException($"A module named '{name}' already exists for this project.");
+	}
+
 	// ---- Task ----
 
 	public async Task<WorkTaskDto> CreateTaskAsync(CreateTaskRequest request, CancellationToken ct = default)
@@ -425,6 +446,8 @@ public class MasterDataService(IMasterDataRepository repository) : IMasterDataSe
 
 		_ = await repository.GetModuleByIdAsync(request.ModuleId, ct)
 			?? throw new EntityNotFoundException(nameof(Module), request.ModuleId);
+
+		await RequireNoDuplicateTaskNameAsync(request.ModuleId, request.Name, excludeTaskId: null, ct: ct);
 
 		var task = new WorkTask { Name = request.Name, ModuleId = request.ModuleId, CreatedAt = DateTime.UtcNow };
 		await repository.AddTaskAsync(task, ct);
@@ -437,9 +460,28 @@ public class MasterDataService(IMasterDataRepository repository) : IMasterDataSe
 		var task = await repository.GetTaskByIdAsync(taskId, ct)
 			?? throw new EntityNotFoundException(nameof(WorkTask), taskId);
 
-		if (request.Name is not null) task.Name = request.Name;
+		if (request.Name is not null)
+		{
+			await RequireNoDuplicateTaskNameAsync(task.ModuleId, request.Name, excludeTaskId: taskId, ct: ct);
+			task.Name = request.Name;
+		}
 		await repository.SaveChangesAsync(ct);
 		return ToDto(task);
+	}
+
+	/// <summary>Mirrors the DB's unique (ModuleId, Name) index (see
+	/// WorkTaskConfiguration) as a friendly pre-check, so a duplicate task
+	/// name under the same module surfaces as a clear 400 instead of a raw
+	/// SQL error.</summary>
+	private async Task RequireNoDuplicateTaskNameAsync(int moduleId, string name, int? excludeTaskId, CancellationToken ct)
+	{
+		var existing = await repository.GetTasksAsync(moduleId, ct);
+		var clash = existing.Any(t =>
+			t.TaskId != excludeTaskId
+			&& string.Equals(t.Name, name, StringComparison.OrdinalIgnoreCase));
+
+		if (clash)
+			throw new BusinessRuleException($"A task named '{name}' already exists under this module.");
 	}
 
 	// ---- Quick add ("Others" self-service, from the timesheet entry screen) ----
