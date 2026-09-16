@@ -5,7 +5,7 @@ public record LocationDto(int Id, string Code, string Name);
 public record AccountDto(int Id, int DepartmentId, string Name, string AccountType);
 
 public record ProjectDto(
-	int Id, int AccountId, string Code, string Name, bool DefaultBillable, bool IsActive,
+	int Id, int AccountId, string Code, string Name, string DefaultBillable, bool IsActive,
 	int? ProjectTypeId, string? ProjectTypeName, string? ProjectTech, string? BillingType,
 	string? CustomerPO, string? Notes, bool NeedsReview,
 	int? ProjectLeadEmployeeId, string? ProjectLeadEmployeeName,
@@ -45,7 +45,7 @@ public record UpdateAccountRequest(int? DepartmentId, string? Name, string? Acco
 /// (Level-1) / Task (Level-2) tree from that type's template under the new
 /// project. Pass null/omit to create an empty project with no modules yet.</summary>
 public record CreateProjectRequest(
-	int AccountId, string Code, string Name, bool DefaultBillable, int? ProjectTypeId,
+	int AccountId, string Code, string Name, string DefaultBillable, int? ProjectTypeId,
 	string? ProjectTech = null, string? BillingType = null, string? CustomerPO = null, string? Notes = null,
 	int? ProjectLeadEmployeeId = null, int? ProjectManagerEmployeeId = null, int? DeliveryHeadEmployeeId = null);
 
@@ -56,7 +56,7 @@ public record CreateProjectRequest(
 /// SyncProjectModulesFromTemplateAsync). Once a project has a ProjectTypeId
 /// this can no longer change it - the backend silently ignores it then.</summary>
 public record UpdateProjectRequest(
-	int? AccountId, string? Code, string? Name, bool? DefaultBillable, bool? IsActive,
+	int? AccountId, string? Code, string? Name, string? DefaultBillable, bool? IsActive,
 	int? ProjectTypeId = null,
 	string? ProjectTech = null, string? BillingType = null, string? CustomerPO = null, string? Notes = null,
 	bool? NeedsReview = null,

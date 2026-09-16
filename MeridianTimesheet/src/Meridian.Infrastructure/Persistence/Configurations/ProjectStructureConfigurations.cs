@@ -12,6 +12,7 @@ public class ProjectConfiguration : IEntityTypeConfiguration<Project>
         builder.HasKey(p => p.ProjectId);
         builder.Property(p => p.Code).HasMaxLength(20).IsRequired();
         builder.Property(p => p.Name).HasMaxLength(200).IsRequired();
+        builder.Property(p => p.DefaultBillable).HasMaxLength(20).IsRequired();
         builder.Property(p => p.ProjectTech).HasMaxLength(200);
         builder.Property(p => p.BillingType).HasMaxLength(30);
         builder.Property(p => p.CustomerPO).HasMaxLength(200);

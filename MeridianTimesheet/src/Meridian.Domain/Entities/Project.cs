@@ -6,7 +6,11 @@ public class Project
     public int AccountId { get; set; }
     public required string Code { get; set; }
     public required string Name { get; set; }
-    public bool DefaultBillable { get; set; } = true;
+    /// <summary>Billable, NonBillable, or PartialBillable - same vocabulary as
+    /// TimeEntry.Classification (see BillingClassificationRules). Applies to
+    /// new task lines on this project by default; an employee can still
+    /// override it per line.</summary>
+    public string DefaultBillable { get; set; } = "Billable";
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }

@@ -1,3 +1,4 @@
+using Meridian.Application.Common;
 using Meridian.Application.DTOs;
 using Meridian.Application.Exceptions;
 using Meridian.Application.Interfaces.Repositories;
@@ -249,6 +250,7 @@ public class MasterDataService(IMasterDataRepository repository) : IMasterDataSe
 		if (string.IsNullOrWhiteSpace(request.Name) || string.IsNullOrWhiteSpace(request.Code))
 			throw new BusinessRuleException("Project name and code are both required.");
 		RequireValidBillingType(request.BillingType);
+		RequireValidDefaultBillable(request.DefaultBillable);
 
 		var existingProjects = await repository.GetProjectsAsync(ct);
 		if (existingProjects.Any(p => string.Equals(p.Code, request.Code, StringComparison.OrdinalIgnoreCase)))
@@ -313,7 +315,11 @@ public class MasterDataService(IMasterDataRepository repository) : IMasterDataSe
 				throw new BusinessRuleException($"A project with code \"{request.Code}\" already exists.");
 			project.Code = request.Code.ToUpperInvariant();
 		}
-		if (request.DefaultBillable is bool billable) project.DefaultBillable = billable;
+		if (request.DefaultBillable is string defaultBillable)
+		{
+			RequireValidDefaultBillable(defaultBillable);
+			project.DefaultBillable = defaultBillable;
+		}
 		if (request.IsActive is bool active) project.IsActive = active;
 		if (request.ProjectTech is not null) project.ProjectTech = request.ProjectTech;
 		if (request.BillingType is not null)
@@ -451,7 +457,7 @@ public class MasterDataService(IMasterDataRepository repository) : IMasterDataSe
 			Name = request.Name,
 			Code = code,
 			AccountId = pendingAccount.AccountId,
-			DefaultBillable = false,
+			DefaultBillable = "NonBillable",
 			IsActive = true,
 			NeedsReview = true,
 			CreatedAt = DateTime.UtcNow,
@@ -651,6 +657,16 @@ public class MasterDataService(IMasterDataRepository repository) : IMasterDataSe
 	{
 		if (!string.IsNullOrWhiteSpace(billingType) && !AllowedBillingTypes.Contains(billingType, StringComparer.OrdinalIgnoreCase))
 			throw new BusinessRuleException($"Billing type must be one of: {string.Join(", ", AllowedBillingTypes)} (got \"{billingType}\").");
+	}
+
+	/// <summary>Same vocabulary as TimeEntry.Classification (Billable /
+	/// NonBillable / PartialBillable) - see BillingClassificationRules. This
+	/// only sets what new task lines on the project default to; it never
+	/// touches any line's own Classification once created.</summary>
+	private static void RequireValidDefaultBillable(string defaultBillable)
+	{
+		if (!BillingClassificationRules.Classifications.Contains(defaultBillable, StringComparer.OrdinalIgnoreCase))
+			throw new BusinessRuleException($"Default classification must be one of: {string.Join(", ", BillingClassificationRules.Classifications)} (got \"{defaultBillable}\").");
 	}
 
 	private static AccountType ParseAccountType(string value) =>
