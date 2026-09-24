@@ -23,8 +23,9 @@ public interface IEmployeeService
 	/// <summary>Creates a new employee — internal (real HR-assigned EmployeeCode
 	/// required) or external (synthetic EXT#### code auto-generated). Grants
 	/// portal access immediately with the same default password + forced
-	/// first-login flow as everyone else. If ProjectIds is supplied, also
-	/// allocates the new employee to those Projects right away.</summary>
+	/// first-login flow as everyone else. If Allocations is supplied, also
+	/// allocates the new employee to those Projects (with their mandatory
+	/// Classification/BillingCategory) right away.</summary>
 	Task<EmployeeDto> CreateEmployeeAsync(CreateEmployeeRequest request, CancellationToken ct = default);
 
 	/// <summary>Sets which client's holiday calendar this employee follows.
@@ -36,9 +37,10 @@ public interface IEmployeeService
 
 	// ---- Project allocation (which Projects this employee is actually working on) ----
 
-	/// <summary>Project IDs this employee is currently allocated to - backs the
-	/// pre-ticked checkbox list on the Edit Employee form.</summary>
-	Task<IReadOnlyList<int>> GetProjectAllocationsAsync(string employeeCode, CancellationToken ct = default);
+	/// <summary>This employee's current project allocations, each with its
+	/// admin-set Classification/BillingCategory - backs the allocation editor
+	/// on the Resources tab.</summary>
+	Task<IReadOnlyList<EmployeeProjectAllocationDto>> GetProjectAllocationsAsync(string employeeCode, CancellationToken ct = default);
 
 	/// <summary>Replaces this employee's full set of project allocations with
 	/// exactly the IDs supplied (adds new ones, removes any no longer ticked).</summary>

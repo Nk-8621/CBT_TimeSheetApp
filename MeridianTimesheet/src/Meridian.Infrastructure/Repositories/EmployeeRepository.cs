@@ -40,7 +40,7 @@ public class EmployeeRepository(MeridianDbContext db) : IEmployeeRepository
 	// ---- Project allocation ----
 
 	public async Task<IReadOnlyList<EmployeeProjectAllocation>> GetProjectAllocationsAsync(int employeeId, CancellationToken ct = default) =>
-	await db.EmployeeProjectAllocations.Where(a => a.EmployeeId == employeeId).ToListAsync(ct);
+	await db.EmployeeProjectAllocations.Include(a => a.Project).Where(a => a.EmployeeId == employeeId).ToListAsync(ct);
 
 	public async Task AddProjectAllocationAsync(EmployeeProjectAllocation allocation, CancellationToken ct = default) =>
 	await db.EmployeeProjectAllocations.AddAsync(allocation, ct);

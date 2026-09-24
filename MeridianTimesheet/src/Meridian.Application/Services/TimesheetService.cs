@@ -79,7 +79,7 @@ public class TimesheetService(
 		var recordByWeek = weekRecords.ToDictionary(w => w.WeekStartDate);
 
 		// Every week that has any logged hours, cross-referenced with its
-		// WeekRecord if one exists (never-submitted weeks won't have one —
+		// WeekRecord if one exists (never-submitted weeks won't have one ï¿½
 		// they're still shown, just as Draft, same convention used elsewhere).
 		var fromEntries = weeklyTotals.Select(w =>
 		{
@@ -95,7 +95,7 @@ public class TimesheetService(
 		});
 
 		// A week could theoretically have a WeekRecord (e.g. submitted, then
-		// every entry later removed) with zero remaining hours — include
+		// every entry later removed) with zero remaining hours ï¿½ include
 		// those too so a submitted-but-now-empty week isn't silently hidden.
 		var entryWeeks = weeklyTotals.Select(w => w.WeekStartDate).ToHashSet();
 		var fromRecordsOnly = weekRecords
@@ -111,9 +111,21 @@ public class TimesheetService(
 	{
 		var employee = await RequireEmployeeAsync(employeeCode, ct);
 		await EnsureWeekEditableAsync(employee.EmployeeId, employeeCode, weekStartDate, ct);
-		BillingClassificationRules.Validate(request.Classification, request.BillingCategory);
 		if (string.IsNullOrWhiteSpace(request.Note))
 			throw new BusinessRuleException("A description is required for this task line.");
+
+		// Classification/BillingCategory are set by the admin at project-
+		// allocation time, not chosen per line - derive them from whichever
+		// allocation matches this project. The one case with no allocation to
+		// derive from is a project just quick-added via "+ Others", which is
+		// pending admin review and has no allocation yet - for that one case
+		// only, fall back to whatever the employee picked, same as before
+		// this feature.
+		var allocations = await employeeRepository.GetProjectAllocationsAsync(employee.EmployeeId, ct);
+		var allocation = allocations.FirstOrDefault(a => a.ProjectId == request.ProjectId);
+		var classification = allocation?.Classification ?? request.Classification;
+		var billingCategory = allocation is not null ? allocation.BillingCategory : request.BillingCategory;
+		BillingClassificationRules.Validate(classification, billingCategory);
 
 		var entry = new TimeEntry
 		{
@@ -122,8 +134,8 @@ public class TimesheetService(
 			ProjectId = request.ProjectId,
 			ModuleId = request.ModuleId,
 			TaskId = request.TaskId,
-			Classification = request.Classification,
-			BillingCategory = request.BillingCategory,
+			Classification = classification,
+			BillingCategory = billingCategory,
 			Note = request.Note,
 			CreatedAt = DateTime.UtcNow,
 		};
@@ -146,21 +158,40 @@ public class TimesheetService(
 		if (request.ProjectId is int p) entry.ProjectId = p;
 		if (request.ModuleId is int m) entry.ModuleId = m;
 		if (request.TaskId is int t) entry.TaskId = t;
-		if (request.Classification is string cls) entry.Classification = cls;
-		if (request.BillingCategory is not null)
+
+		// Classification/BillingCategory are set by the admin at project-
+		// allocation time, not chosen per line (same rule AddEntryAsync
+		// applies) - whenever the entry's (possibly just-changed) project has
+		// an allocation, it always wins over whatever the client sent for
+		// either field. The one case with no allocation to defer to is a
+		// project quick-added via "+ Others" and still pending admin review -
+		// only there does the client's explicit Classification/BillingCategory
+		// (still chosen manually in EntryDrawer for that one case) apply.
+		var allocations = await employeeRepository.GetProjectAllocationsAsync(employee.EmployeeId, ct);
+		var allocation = allocations.FirstOrDefault(a => a.ProjectId == entry.ProjectId);
+		if (allocation is not null)
 		{
-			entry.BillingCategory = request.BillingCategory;
+			entry.Classification = allocation.Classification;
+			entry.BillingCategory = allocation.BillingCategory;
 		}
-		else if (entry.BillingCategory is not null
-			&& BillingClassificationRules.AllowedCategories.TryGetValue(entry.Classification, out var allowedCategories)
-			&& !allowedCategories.Contains(entry.BillingCategory))
+		else
 		{
-			// Classification changed (e.g. to PartialBillable, which allows no category at
-			// all) and left a now-incompatible category behind. UpdateTimeEntryRequest can't
-			// explicitly clear BillingCategory back to null, so if the caller didn't set a new
-			// one, drop the stale value here rather than blocking the save on a field the user
-			// never touched.
-			entry.BillingCategory = null;
+			if (request.Classification is string cls) entry.Classification = cls;
+			if (request.BillingCategory is not null)
+			{
+				entry.BillingCategory = request.BillingCategory;
+			}
+			else if (entry.BillingCategory is not null
+				&& BillingClassificationRules.AllowedCategories.TryGetValue(entry.Classification, out var allowedCategories)
+				&& !allowedCategories.Contains(entry.BillingCategory))
+			{
+				// Classification changed (e.g. to PartialBillable, which allows no category at
+				// all) and left a now-incompatible category behind. UpdateTimeEntryRequest can't
+				// explicitly clear BillingCategory back to null, so if the caller didn't set a new
+				// one, drop the stale value here rather than blocking the save on a field the user
+				// never touched.
+				entry.BillingCategory = null;
+			}
 		}
 		if (request.Note is not null)
 		{

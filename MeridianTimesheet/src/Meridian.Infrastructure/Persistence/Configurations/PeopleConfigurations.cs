@@ -106,6 +106,8 @@ public class EmployeeProjectAllocationConfiguration : IEntityTypeConfiguration<E
     {
         builder.ToTable("Carbynetech_EmployeeProjectAllocation");
         builder.HasKey(ea => new { ea.EmployeeId, ea.ProjectId });
+        builder.Property(ea => ea.Classification).HasMaxLength(20).IsRequired();
+        builder.Property(ea => ea.BillingCategory).HasMaxLength(10);
 
         builder.HasOne(ea => ea.Employee)
             .WithMany(e => e.ProjectAllocations)

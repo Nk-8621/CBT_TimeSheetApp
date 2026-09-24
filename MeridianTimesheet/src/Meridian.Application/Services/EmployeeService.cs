@@ -1,3 +1,4 @@
+using Meridian.Application.Common;
 using Meridian.Application.DTOs;
 using Meridian.Application.Exceptions;
 using Meridian.Application.Interfaces.Repositories;
@@ -97,13 +98,20 @@ public class EmployeeService(IEmployeeRepository employeeRepository, IMasterData
 			employeeCode = request.EmployeeCode;
 		}
 
-		// Validate every requested project up front, before anything is
-		// written � a bad project id should fail the whole create, not leave
-		// a half-allocated employee behind.
-		var projectIds = (request.ProjectIds ?? []).Distinct().ToList();
-		foreach (var projectId in projectIds)
-			_ = await masterDataRepository.GetProjectByIdAsync(projectId, ct)
-				?? throw new EntityNotFoundException(nameof(Project), projectId);
+		// Validate every requested allocation up front, before anything is
+		// written � a bad project id or an invalid classification/category
+		// should fail the whole create, not leave a half-allocated employee
+		// behind.
+		var allocations = (request.Allocations ?? []).ToList();
+		var allocationProjectIds = allocations.Select(a => a.ProjectId).ToList();
+		if (allocationProjectIds.Distinct().Count() != allocationProjectIds.Count)
+			throw new BusinessRuleException("Each project can only be assigned once.");
+		foreach (var allocation in allocations)
+		{
+			_ = await masterDataRepository.GetProjectByIdAsync(allocation.ProjectId, ct)
+				?? throw new EntityNotFoundException(nameof(Project), allocation.ProjectId);
+			BillingClassificationRules.Validate(allocation.Classification, allocation.BillingCategory);
+		}
 
 		var employee = new Employee
 		{
@@ -123,14 +131,16 @@ public class EmployeeService(IEmployeeRepository employeeRepository, IMasterData
 		await employeeRepository.AddAsync(employee, ct);
 		await employeeRepository.SaveChangesAsync(ct); // populates employee.EmployeeId before an allocation can reference it
 
-		foreach (var projectId in projectIds)
+		foreach (var allocation in allocations)
 			await employeeRepository.AddProjectAllocationAsync(new EmployeeProjectAllocation
 			{
 				EmployeeId = employee.EmployeeId,
-				ProjectId = projectId,
+				ProjectId = allocation.ProjectId,
+				Classification = allocation.Classification,
+				BillingCategory = allocation.BillingCategory,
 				AssignedAt = DateTime.UtcNow,
 			}, ct);
-		if (projectIds.Count > 0)
+		if (allocations.Count > 0)
 			await employeeRepository.SaveChangesAsync(ct);
 
 		return await ToDtoAsync(employee, ct);
@@ -196,13 +206,20 @@ public class EmployeeService(IEmployeeRepository employeeRepository, IMasterData
 
 	// ---- Project allocation ----
 
-	public async Task<IReadOnlyList<int>> GetProjectAllocationsAsync(string employeeCode, CancellationToken ct = default)
+	public async Task<IReadOnlyList<EmployeeProjectAllocationDto>> GetProjectAllocationsAsync(string employeeCode, CancellationToken ct = default)
 	{
 		var employee = await employeeRepository.GetByCodeAsync(employeeCode, ct)
 			?? throw new EntityNotFoundException(nameof(Employee), employeeCode);
 
 		var allocations = await employeeRepository.GetProjectAllocationsAsync(employee.EmployeeId, ct);
-		return allocations.Select(a => a.ProjectId).ToList();
+		return allocations
+			.Select(a => new EmployeeProjectAllocationDto(
+				a.ProjectId,
+				a.Project?.Code ?? "",
+				a.Project?.Name ?? "",
+				a.Classification,
+				a.BillingCategory))
+			.ToList();
 	}
 
 	public async Task SetProjectAllocationsAsync(string employeeCode, SetEmployeeProjectAllocationsRequest request, CancellationToken ct = default)
@@ -210,25 +227,46 @@ public class EmployeeService(IEmployeeRepository employeeRepository, IMasterData
 		var employee = await employeeRepository.GetByCodeAsync(employeeCode, ct)
 			?? throw new EntityNotFoundException(nameof(Employee), employeeCode);
 
-		var requestedIds = (request.ProjectIds ?? []).Distinct().ToList();
-		foreach (var projectId in requestedIds)
-			_ = await masterDataRepository.GetProjectByIdAsync(projectId, ct)
-				?? throw new EntityNotFoundException(nameof(Project), projectId);
+		var requested = request.Allocations ?? [];
+		var requestedProjectIds = requested.Select(a => a.ProjectId).ToList();
+		if (requestedProjectIds.Distinct().Count() != requestedProjectIds.Count)
+			throw new BusinessRuleException("Each project can only be assigned once.");
+
+		foreach (var allocation in requested)
+		{
+			_ = await masterDataRepository.GetProjectByIdAsync(allocation.ProjectId, ct)
+				?? throw new EntityNotFoundException(nameof(Project), allocation.ProjectId);
+			BillingClassificationRules.Validate(allocation.Classification, allocation.BillingCategory);
+		}
 
 		var current = await employeeRepository.GetProjectAllocationsAsync(employee.EmployeeId, ct);
-		var currentIds = current.Select(a => a.ProjectId).ToHashSet();
+		var currentByProjectId = current.ToDictionary(a => a.ProjectId);
+		var requestedIds = requestedProjectIds.ToHashSet();
 
 		var toRemove = current.Where(a => !requestedIds.Contains(a.ProjectId)).ToList();
-		var toAddIds = requestedIds.Where(id => !currentIds.Contains(id)).ToList();
-
 		employeeRepository.RemoveProjectAllocations(toRemove);
-		foreach (var projectId in toAddIds)
-			await employeeRepository.AddProjectAllocationAsync(new EmployeeProjectAllocation
+
+		foreach (var allocation in requested)
+		{
+			if (currentByProjectId.TryGetValue(allocation.ProjectId, out var existing))
 			{
-				EmployeeId = employee.EmployeeId,
-				ProjectId = projectId,
-				AssignedAt = DateTime.UtcNow,
-			}, ct);
+				// Already allocated - just refresh the classification/category
+				// admin chose this time, in place.
+				existing.Classification = allocation.Classification;
+				existing.BillingCategory = allocation.BillingCategory;
+			}
+			else
+			{
+				await employeeRepository.AddProjectAllocationAsync(new EmployeeProjectAllocation
+				{
+					EmployeeId = employee.EmployeeId,
+					ProjectId = allocation.ProjectId,
+					Classification = allocation.Classification,
+					BillingCategory = allocation.BillingCategory,
+					AssignedAt = DateTime.UtcNow,
+				}, ct);
+			}
+		}
 
 		await employeeRepository.SaveChangesAsync(ct);
 	}
