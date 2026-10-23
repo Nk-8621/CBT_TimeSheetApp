@@ -131,6 +131,10 @@ public class MasterDataRepository(MeridianDbContext db) : IMasterDataRepository
 
 	public void RemoveHoliday(Holiday holiday) => db.Holidays.Remove(holiday);
 
+	public void RemoveModule(Module module) => db.Modules.Remove(module);
+
+	public void RemoveTask(WorkTask task) => db.Tasks.Remove(task);
+
 	public async Task AddProjectTypeAsync(ProjectType projectType, CancellationToken ct = default) =>
 		await db.ProjectTypes.AddAsync(projectType, ct);
 

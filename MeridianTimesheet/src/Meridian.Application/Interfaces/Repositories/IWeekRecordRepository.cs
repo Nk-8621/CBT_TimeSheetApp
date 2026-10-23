@@ -12,9 +12,14 @@ public interface IWeekRecordRepository
 
 	/// <summary>All week records this employee has ever submitted, for the history
 	/// screen. Weeks that were only ever a draft (never submitted) won't have a
-	/// row here — the service layer combines this with time-entry data to cover
+	/// row here ï¿½ the service layer combines this with time-entry data to cover
 	/// those too.</summary>
 	Task<IReadOnlyList<WeekRecord>> GetAllForEmployeeAsync(int employeeId, CancellationToken ct = default);
+
+	/// <summary>Every week record for these employees across the weeks
+	/// from..to (inclusive) in ONE query - read-only, approval trail not loaded.
+	/// Used by Reports and Team Compliance instead of one query per employee per week.</summary>
+	Task<IReadOnlyList<WeekRecord>> GetForEmployeesAsync(IReadOnlyList<int> employeeIds, DateOnly fromWeek, DateOnly toWeek, CancellationToken ct = default);
 
 	Task SaveChangesAsync(CancellationToken ct = default);
 }

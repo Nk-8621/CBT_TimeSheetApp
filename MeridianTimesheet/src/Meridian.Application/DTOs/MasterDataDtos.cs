@@ -65,6 +65,10 @@ public record UpdateProjectRequest(
 public record CreateModuleRequest(int ProjectId, string Name, int? ProjectTypeId = null);
 public record UpdateModuleRequest(string? Name, int? ProjectTypeId = null);
 
+/// <summary>How many timesheet lines use a Module or Task. Zero means it can
+/// be deleted; above zero, a rename also changes the name on those lines.</summary>
+public record MasterDataUsageDto(int TimeEntryCount);
+
 public record CreateTaskRequest(int ModuleId, string Name);
 public record UpdateTaskRequest(string? Name);
 
@@ -80,7 +84,10 @@ public record QuickAddModuleRequest(int ProjectId, string Name);
 public record QuickAddTaskRequest(int ModuleId, string Name);
 
 public record CreateHolidayRequest(DateOnly HolidayDate, string Name, string Location, int? AccountId = null);
-public record UpdateHolidayRequest(DateOnly? HolidayDate, string? Name, string? Location, int? AccountId = null);
+/// <summary>AccountId null means "leave the client scope unchanged", like every
+/// other optional field here - so ClearAccountId is the explicit way to turn a
+/// client-specific holiday back into a company-wide one.</summary>
+public record UpdateHolidayRequest(DateOnly? HolidayDate, string? Name, string? Location, int? AccountId = null, bool ClearAccountId = false);
 public record HolidayDto(int HolidayId, DateOnly Date, string Name, string Location, int? AccountId);
 
 // ---- Project-wise resource allocation (admin reporting) ----

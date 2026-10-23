@@ -113,6 +113,9 @@ public class TimesheetService(
 		await EnsureWeekEditableAsync(employee.EmployeeId, employeeCode, weekStartDate, ct);
 		if (string.IsNullOrWhiteSpace(request.Note))
 			throw new BusinessRuleException("A description is required for this task line.");
+		EnsureNoteLength(request.Note);
+		TimeEntryRules.ValidateHours(request.HoursByDay);
+		await EnsureValidHierarchyAsync(request.ProjectId, request.ModuleId, request.TaskId, requireActiveProject: true, ct);
 
 		// Classification/BillingCategory are set by the admin at project-
 		// allocation time, not chosen per line - derive them from whichever
@@ -155,6 +158,14 @@ public class TimesheetService(
 			?? throw new EntityNotFoundException(nameof(Employee), entry.EmployeeId);
 		await EnsureWeekEditableAsync(employee.EmployeeId, employee.EmployeeCode, entry.WeekStartDate, ct);
 
+		if (request.ProjectId is not null || request.ModuleId is not null || request.TaskId is not null)
+		{
+			// Only re-checked when the line is actually re-pointed - an hours-only
+			// edit on a line whose project was later deactivated must still work.
+			await EnsureValidHierarchyAsync(
+				request.ProjectId ?? entry.ProjectId, request.ModuleId ?? entry.ModuleId, request.TaskId ?? entry.TaskId,
+				requireActiveProject: request.ProjectId is int newProjectId && newProjectId != entry.ProjectId, ct);
+		}
 		if (request.ProjectId is int p) entry.ProjectId = p;
 		if (request.ModuleId is int m) entry.ModuleId = m;
 		if (request.TaskId is int t) entry.TaskId = t;
@@ -203,9 +214,14 @@ public class TimesheetService(
 			// a blank Note truly can't be saved (see AddEntryAsync / EntryDrawer.tsx).
 			if (string.IsNullOrWhiteSpace(request.Note))
 				throw new BusinessRuleException("A description is required for this task line.");
+			EnsureNoteLength(request.Note);
 			entry.Note = request.Note;
 		}
-		if (request.HoursByDay is decimal[] hours) entry.HoursByDay = hours;
+		if (request.HoursByDay is decimal[] hours)
+		{
+			TimeEntryRules.ValidateHours(hours);
+			entry.HoursByDay = hours;
+		}
 		entry.UpdatedAt = DateTime.UtcNow;
 		BillingClassificationRules.Validate(entry.Classification, entry.BillingCategory);
 
@@ -224,6 +240,14 @@ public class TimesheetService(
 
 		timeEntryRepository.Remove(entry);
 		await timeEntryRepository.SaveChangesAsync(ct);
+	}
+
+	public async Task<string?> GetEntryOwnerCodeAsync(int timeEntryId, CancellationToken ct = default)
+	{
+		var entry = await timeEntryRepository.GetByIdAsync(timeEntryId, ct);
+		if (entry is null) return null;
+		var employee = await employeeRepository.GetByIdAsync(entry.EmployeeId, ct);
+		return employee?.EmployeeCode;
 	}
 
 	public async Task<DayTypeDto> SetDayTypeAsync(string employeeCode, DateOnly date, string dayType, CancellationToken ct = default)
@@ -289,6 +313,37 @@ public class TimesheetService(
 	private async Task<Employee> RequireEmployeeAsync(string employeeCode, CancellationToken ct) =>
 		await employeeRepository.GetByCodeAsync(employeeCode, ct)
 			?? throw new EntityNotFoundException(nameof(Employee), employeeCode);
+
+	/// <summary>The UI only ever offers a Module under the chosen Project and a
+	/// Task under the chosen Module, but nothing server-side enforced that - a
+	/// mismatched combination (or a hand-crafted request) would save a line
+	/// whose Project, Module and Task disagree, which then rolls up wrongly in
+	/// Reports and the approval detail. New lines also can't target an
+	/// inactive project (the UI already hides those from Add Task Line).</summary>
+	private async Task EnsureValidHierarchyAsync(int projectId, int moduleId, int taskId, bool requireActiveProject, CancellationToken ct)
+	{
+		var project = await masterDataRepository.GetProjectByIdAsync(projectId, ct)
+			?? throw new EntityNotFoundException(nameof(Project), projectId);
+		var module = await masterDataRepository.GetModuleByIdAsync(moduleId, ct)
+			?? throw new EntityNotFoundException(nameof(Module), moduleId);
+		var task = await masterDataRepository.GetTaskByIdAsync(taskId, ct)
+			?? throw new EntityNotFoundException(nameof(WorkTask), taskId);
+
+		if (module.ProjectId != project.ProjectId)
+			throw new BusinessRuleException($"Module \"{module.Name}\" doesn't belong to project \"{project.Name}\".");
+		if (task.ModuleId != module.ModuleId)
+			throw new BusinessRuleException($"Task \"{task.Name}\" doesn't belong to module \"{module.Name}\".");
+		if (requireActiveProject && !project.IsActive)
+			throw new BusinessRuleException($"Project \"{project.Name}\" is inactive - time can't be logged against it.");
+	}
+
+	/// <summary>Carbynetech_TimeEntry.Note is NVARCHAR(500) - over that used to
+	/// surface as a generic 500 ("An unexpected error occurred").</summary>
+	private static void EnsureNoteLength(string note)
+	{
+		if (note.Length > 500)
+			throw new BusinessRuleException($"The description is {note.Length} characters - please keep it to 500 or fewer.");
+	}
 
 	private async Task EnsureWeekEditableAsync(int employeeId, string employeeCode, DateOnly weekStartDate, CancellationToken ct)
 	{

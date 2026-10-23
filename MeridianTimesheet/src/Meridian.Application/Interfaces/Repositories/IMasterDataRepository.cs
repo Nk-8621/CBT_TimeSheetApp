@@ -49,6 +49,8 @@ public interface IMasterDataRepository
 	Task AddTaskAsync(WorkTask task, CancellationToken ct = default);
 	Task AddHolidayAsync(Holiday holiday, CancellationToken ct = default);
 	void RemoveHoliday(Holiday holiday);
+	void RemoveModule(Module module);
+	void RemoveTask(WorkTask task);
 	Task AddProjectTypeAsync(ProjectType projectType, CancellationToken ct = default);
 	void RemoveProjectType(ProjectType projectType);
 	Task AddModuleTemplateAsync(ProjectTypeModuleTemplate template, CancellationToken ct = default);

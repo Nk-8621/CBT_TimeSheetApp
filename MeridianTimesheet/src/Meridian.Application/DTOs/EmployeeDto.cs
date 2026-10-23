@@ -12,7 +12,8 @@ public record EmployeeDto(
     int? ManagerEmployeeId,
     string? ManagerName,
 	bool IsActive,
-	int? PrimaryAccountId = null
+	int? PrimaryAccountId = null,
+	string? Email = null
 );
 
 public record RoleDto(string Code, string Name, IReadOnlyList<string> AllowedNavKeys);

@@ -24,6 +24,18 @@ namespace Meridian.Application.DTOs
 
 	public record SetPrimaryAccountRequest(int? AccountId);
 
+	/// <summary>Admin edit of an existing employee's basic details - the Edit
+	/// button on the Master Data Resources tab. Every field is required (the
+	/// form always sends the full set). EmployeeCode and Internal/External can't
+	/// be changed here.</summary>
+	public record UpdateEmployeeRequest(
+		string FullName,
+		string Email,
+		string Designation,
+		int DepartmentId,
+		string ManagerEmployeeCode
+	);
+
 	/// <summary>Replaces an employee's full set of Project allocations in one
 	/// call, each with its admin-set Classification + BillingCategory -
 	/// IEmployeeService.SetProjectAllocationsAsync adds/updates whatever's

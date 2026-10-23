@@ -33,10 +33,12 @@ public class ReportsService(
 		var nonBillable = new Dictionary<int, decimal>();
 		var employeesByProject = new Dictionary<int, HashSet<int>>();
 
-		foreach (var employeeId in employeeIds)
+		// One query for everyone's lines this week, instead of one per employee.
+		var weekEntries = await timeEntryRepository.GetForEmployeesAsync(employeeIds, weekStart, weekStart, ct);
+		foreach (var employeeEntries in weekEntries.GroupBy(e => e.EmployeeId))
 		{
-			var entries = await timeEntryRepository.GetForWeekAsync(employeeId, weekStart, ct);
-			foreach (var entry in entries)
+			var employeeId = employeeEntries.Key;
+			foreach (var entry in employeeEntries)
 			{
 				var hours = entry.TotalHours;
 				if (hours == 0) continue;
@@ -86,16 +88,23 @@ public class ReportsService(
 		for (var w = weekFrom; w <= weekTo; w = w.AddDays(7))
 			weeksInRange.Add(w);
 
+		// Everything for the whole range in two queries (lines + week statuses),
+		// instead of two queries per employee per week.
+		var rangeEntries = await timeEntryRepository.GetForEmployeesAsync(employeeIds, weekFrom, weekTo, ct);
+		var entriesByEmployeeWeek = rangeEntries.ToLookup(e => (e.EmployeeId, e.WeekStartDate));
+		var rangeWeekRecords = await weekRecordRepository.GetForEmployeesAsync(employeeIds, weekFrom, weekTo, ct);
+		var statusByEmployeeWeek = rangeWeekRecords.ToDictionary(w => (w.EmployeeId, w.WeekStartDate), w => w.Status);
+
 		var contributions = new List<Contribution>();
 		foreach (var employeeId in employeeIds)
 		{
 			foreach (var week in weeksInRange)
 			{
-				var weekRecord = await weekRecordRepository.GetAsync(employeeId, week, ct);
-				var status = weekRecord?.Status ?? WeekStatus.Draft;
+				// No week record yet means the week was never submitted - a Draft.
+				var status = statusByEmployeeWeek.TryGetValue((employeeId, week), out var recordedStatus) ? recordedStatus : WeekStatus.Draft;
 				if (!statusSet.Contains(status)) continue;
 
-				var entries = await timeEntryRepository.GetForWeekAsync(employeeId, week, ct);
+				var entries = entriesByEmployeeWeek[(employeeId, week)];
 				foreach (var entry in entries)
 				{
 					var hours = entry.TotalHours;

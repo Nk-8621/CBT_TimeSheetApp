@@ -18,6 +18,12 @@ public interface ITimesheetService
 	Task<TimeEntryDto> UpdateEntryAsync(int timeEntryId, UpdateTimeEntryRequest request, CancellationToken ct = default);
 	Task RemoveEntryAsync(int timeEntryId, CancellationToken ct = default);
 
+	/// <summary>The EmployeeCode that owns this time entry, or null if the entry
+	/// doesn't exist - lets the controller apply the same "your own data, or
+	/// Admin" check to the by-id Update/Remove endpoints that every other
+	/// timesheet endpoint applies via the employeeCode in its route.</summary>
+	Task<string?> GetEntryOwnerCodeAsync(int timeEntryId, CancellationToken ct = default);
+
 	Task<DayTypeDto> SetDayTypeAsync(string employeeCode, DateOnly date, string dayType, CancellationToken ct = default);
 
 	/// <summary>Copies last week's distinct (module, task) lines forward with hours

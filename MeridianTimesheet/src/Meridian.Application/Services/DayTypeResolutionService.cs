@@ -26,16 +26,25 @@ public class DayTypeResolutionService(
 		var leaveRequests = await dayTypeRequestRepository.GetActiveLeaveForWeekAsync(employeeId, weekStartDate, ct);
 		var leaveRequestByDate = leaveRequests.ToDictionary(r => r.RequestDate, r => r.RequestType);
 
+		// One query for the whole week instead of one per day. Same rule as
+		// IMasterDataRepository.GetHolidayOnAsync: a company-wide holiday
+		// (no client), or one for this employee's primary client.
+		var weekHolidays = await masterDataRepository.GetHolidaysAsync(days[0], days[^1], ct);
+		var holidayDates = weekHolidays
+			.Where(h => h.AccountId == null || h.AccountId == primaryAccountId)
+			.Select(h => h.HolidayDate)
+			.ToHashSet();
+
 		var result = new List<DayTypeDto>(7);
 		foreach (var date in days)
 		{
-			var holiday = await masterDataRepository.GetHolidayOnAsync(date, primaryAccountId, ct);
+			var isHoliday = holidayDates.Contains(date);
 			var isOnLeave = leaveDates.Contains(date);
 			overrideByDate.TryGetValue(date, out var overrideType);
 			leaveRequestByDate.TryGetValue(date, out var leaveRequestType);
 
 			var resolved = DayTypeResolver.Resolve(
-				date, holiday is not null, isOnLeave,
+				date, isHoliday, isOnLeave,
 				leaveRequestByDate.ContainsKey(date) ? leaveRequestType : null,
 				overrideByDate.ContainsKey(date) ? overrideType : null);
 			var capacity = resolved switch

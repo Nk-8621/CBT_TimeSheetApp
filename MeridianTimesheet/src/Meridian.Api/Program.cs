@@ -46,15 +46,16 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddAuthorization();
 
 // ---- CORS (the React dev server runs on a different origin) ----
+// Only the addresses listed under Cors:AllowedOrigins in appsettings.json may
+// call this API from a browser (previously any website could).
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
-	?? ["http://localhost:5173", "http://172.16.0.177:8077","*"];
+	?? ["http://localhost:5173"];
 
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("Frontend", policy =>
     {
-        policy.WithOrigins("http://timesheet.carbynetech.com:8077", "https://timesheet.carbynetech.com:8443")
-            .AllowAnyOrigin()
+        policy.WithOrigins(allowedOrigins)
             .AllowAnyHeader()
             .AllowAnyMethod();
     });

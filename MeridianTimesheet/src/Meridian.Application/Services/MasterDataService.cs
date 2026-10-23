@@ -8,7 +8,7 @@ using Meridian.Domain.Enums;
 
 namespace Meridian.Application.Services;
 
-public class MasterDataService(IMasterDataRepository repository) : IMasterDataService
+public class MasterDataService(IMasterDataRepository repository, ITimeEntryRepository timeEntryRepository) : IMasterDataService
 {
 	/// <summary>Fixed, T&M, Consumption, NB-ValueAdd, NB-L&D, NB-Training, NB-Travel, Others.</summary>
 	private static readonly string[] AllowedBillingTypes =
@@ -469,6 +469,58 @@ public class MasterDataService(IMasterDataRepository repository) : IMasterDataSe
 		return ToDto(task);
 	}
 
+	// ---- Usage + delete ----
+
+	public async Task<MasterDataUsageDto> GetModuleUsageAsync(int moduleId, CancellationToken ct = default)
+	{
+		_ = await repository.GetModuleByIdAsync(moduleId, ct)
+			?? throw new EntityNotFoundException(nameof(Module), moduleId);
+		return new MasterDataUsageDto(await timeEntryRepository.CountForModuleAsync(moduleId, ct));
+	}
+
+	public async Task<MasterDataUsageDto> GetTaskUsageAsync(int taskId, CancellationToken ct = default)
+	{
+		_ = await repository.GetTaskByIdAsync(taskId, ct)
+			?? throw new EntityNotFoundException(nameof(WorkTask), taskId);
+		return new MasterDataUsageDto(await timeEntryRepository.CountForTaskAsync(taskId, ct));
+	}
+
+	public async Task DeleteModuleAsync(int moduleId, CancellationToken ct = default)
+	{
+		var module = await repository.GetModuleByIdAsync(moduleId, ct)
+			?? throw new EntityNotFoundException(nameof(Module), moduleId);
+
+		var usedByLines = await timeEntryRepository.CountForModuleAsync(moduleId, ct);
+		if (usedByLines > 0)
+			throw new BusinessRuleException(
+				$"Module \"{module.Name}\" can't be deleted — it's used in {usedByLines} timesheet line(s). You can still rename it.");
+
+		// Task -> Module is ON DELETE RESTRICT, so the module's tasks go first.
+		// None of them can have lines either (a line always records both).
+		var tasks = await repository.GetTasksAsync(moduleId, ct);
+		foreach (var task in tasks)
+		{
+			var trackedTask = await repository.GetTaskByIdAsync(task.TaskId, ct);
+			if (trackedTask is not null) repository.RemoveTask(trackedTask);
+		}
+		repository.RemoveModule(module);
+		await repository.SaveChangesAsync(ct);
+	}
+
+	public async Task DeleteTaskAsync(int taskId, CancellationToken ct = default)
+	{
+		var task = await repository.GetTaskByIdAsync(taskId, ct)
+			?? throw new EntityNotFoundException(nameof(WorkTask), taskId);
+
+		var usedByLines = await timeEntryRepository.CountForTaskAsync(taskId, ct);
+		if (usedByLines > 0)
+			throw new BusinessRuleException(
+				$"Task type \"{task.Name}\" can't be deleted — it's used in {usedByLines} timesheet line(s). You can still rename it.");
+
+		repository.RemoveTask(task);
+		await repository.SaveChangesAsync(ct);
+	}
+
 	/// <summary>Mirrors the DB's unique (ModuleId, Name) index (see
 	/// WorkTaskConfiguration) as a friendly pre-check, so a duplicate task
 	/// name under the same module surfaces as a clear 400 instead of a raw
@@ -518,7 +570,15 @@ public class MasterDataService(IMasterDataRepository repository) : IMasterDataSe
 		_ = await repository.GetProjectByIdAsync(request.ProjectId, ct)
 			?? throw new EntityNotFoundException(nameof(Project), request.ProjectId);
 
-		var module = new Module { Name = request.Name, ProjectId = request.ProjectId, CreatedAt = DateTime.UtcNow };
+		// An employee typing a name that already exists under this project
+		// almost always means "that one" - hand it back instead of tripping the
+		// unique (ProjectId, Name) index, which surfaced as a raw 500 before.
+		var name = request.Name.Trim();
+		var existing = (await repository.GetModulesAsync(request.ProjectId, ct))
+			.FirstOrDefault(m => string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase));
+		if (existing is not null) return ToDto(existing);
+
+		var module = new Module { Name = name, ProjectId = request.ProjectId, CreatedAt = DateTime.UtcNow };
 		await repository.AddModuleAsync(module, ct);
 		await repository.SaveChangesAsync(ct);
 		return new ModuleDto(module.ModuleId, module.ProjectId, module.Name, null, null);
@@ -531,7 +591,13 @@ public class MasterDataService(IMasterDataRepository repository) : IMasterDataSe
 		_ = await repository.GetModuleByIdAsync(request.ModuleId, ct)
 			?? throw new EntityNotFoundException(nameof(Module), request.ModuleId);
 
-		var task = new WorkTask { Name = request.Name, ModuleId = request.ModuleId, CreatedAt = DateTime.UtcNow };
+		// Same reuse-don't-duplicate rule as QuickAddModuleAsync above.
+		var name = request.Name.Trim();
+		var existing = (await repository.GetTasksAsync(request.ModuleId, ct))
+			.FirstOrDefault(t => string.Equals(t.Name, name, StringComparison.OrdinalIgnoreCase));
+		if (existing is not null) return ToDto(existing);
+
+		var task = new WorkTask { Name = name, ModuleId = request.ModuleId, CreatedAt = DateTime.UtcNow };
 		await repository.AddTaskAsync(task, ct);
 		await repository.SaveChangesAsync(ct);
 		return ToDto(task);
@@ -571,7 +637,7 @@ public class MasterDataService(IMasterDataRepository repository) : IMasterDataSe
 
 		var newDate = request.HolidayDate ?? holiday.HolidayDate;
 		var newLocation = request.Location ?? holiday.Location;
-		var newAccountId = request.AccountId ?? holiday.AccountId;
+		var newAccountId = request.ClearAccountId ? null : request.AccountId ?? holiday.AccountId;
 
 		if (request.AccountId is int accId)
 			_ = await repository.GetAccountByIdAsync(accId, ct) ?? throw new EntityNotFoundException(nameof(Account), accId);

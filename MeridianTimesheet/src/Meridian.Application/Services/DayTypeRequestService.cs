@@ -25,6 +25,8 @@ public class DayTypeRequestService(
 			throw new BusinessRuleException("Request type must be one of WFH, LeaveFirstHalf, LeaveSecondHalf or LeaveFull.");
 		if (string.IsNullOrWhiteSpace(note))
 			throw new BusinessRuleException("A note is required for this request.");
+		if (note.Length > 500) // Carbynetech_DayTypeRequest.Note is NVARCHAR(500)
+			throw new BusinessRuleException("Please keep the note to 500 characters or fewer.");
 		// Past dates are allowed up to a month back (e.g. catching up on a
 		// WFH/Leave day that was missed at the time), but no further - there's
 		// no upper bound on how far into the future one can be requested.
@@ -105,6 +107,8 @@ public class DayTypeRequestService(
 		var request = await RequireRequestAsync(dayTypeRequestId, ct);
 		if (request.Status is not DayTypeRequestStatus.Pending)
 			throw new BusinessRuleException("This request has already been decided.");
+		if (comment is { Length: > 500 }) // Carbynetech_DayTypeRequest.DecisionComment is NVARCHAR(500)
+			throw new BusinessRuleException("Please keep the comment to 500 characters or fewer.");
 
 		var employee = await RequireEmployeeByIdAsync(request.EmployeeId, ct);
 		await EnsureIsManagerAsync(employee.EmployeeCode, approverEmployeeCode, ct);

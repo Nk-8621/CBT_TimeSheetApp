@@ -33,19 +33,21 @@ public class ApprovalsController(IWeekApprovalService approvalService, ICurrentU
 	}
 
 	/// <summary>Approves as the CALLER — you can only approve using your own
-	/// identity, never on someone else's behalf (Admin included).</summary>
+	/// identity, never on someone else's behalf (Admin included). The comment
+	/// body is optional (bulk approve sends none) - same optional-body
+	/// convention as DELETE project-types/{id}.</summary>
 	[HttpPost("{employeeCode}/{weekStart}/approve-level1")]
-	public async Task<IActionResult> ApproveLevel1(string employeeCode, DateOnly weekStart, CancellationToken ct)
+	public async Task<IActionResult> ApproveLevel1(string employeeCode, DateOnly weekStart, [FromBody] ApproveWeekRequest? request, CancellationToken ct)
 	{
 		if (CurrentUser.EmployeeCode is null) return Unauthorized();
-		return Ok(await approvalService.ApproveLevel1Async(employeeCode, weekStart, CurrentUser.EmployeeCode, ct));
+		return Ok(await approvalService.ApproveLevel1Async(employeeCode, weekStart, CurrentUser.EmployeeCode, request?.Comment, ct));
 	}
 
 	[HttpPost("{employeeCode}/{weekStart}/approve-level2")]
-	public async Task<IActionResult> ApproveLevel2(string employeeCode, DateOnly weekStart, CancellationToken ct)
+	public async Task<IActionResult> ApproveLevel2(string employeeCode, DateOnly weekStart, [FromBody] ApproveWeekRequest? request, CancellationToken ct)
 	{
 		if (CurrentUser.EmployeeCode is null) return Unauthorized();
-		return Ok(await approvalService.ApproveLevel2Async(employeeCode, weekStart, CurrentUser.EmployeeCode, ct));
+		return Ok(await approvalService.ApproveLevel2Async(employeeCode, weekStart, CurrentUser.EmployeeCode, request?.Comment, ct));
 	}
 
 	[HttpPost("{employeeCode}/{weekStart}/reject")]

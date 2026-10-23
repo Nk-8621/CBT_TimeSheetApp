@@ -34,11 +34,23 @@ public class TeamService(
 		var departments = await masterDataRepository.GetDepartmentsAsync(ct);
 		var deptById = departments.ToDictionary(d => d.DepartmentId);
 
+		// Everyone's lines and week records for this week in two queries,
+		// rather than two queries per employee.
+		var employeeIds = employees.Select(e => e.EmployeeId).ToList();
+		var allEntries = await timeEntryRepository.GetForEmployeesAsync(employeeIds, weekStart, weekStart, ct);
+		var entriesByEmployee = allEntries.ToLookup(e => e.EmployeeId);
+		var allWeeks = await weekRecordRepository.GetForEmployeesAsync(employeeIds, weekStart, weekStart, ct);
+		var weekByEmployee = allWeeks.ToDictionary(w => w.EmployeeId);
+
 		var rows = new List<TeamComplianceRowDto>(employees.Count);
 		foreach (var employee in employees)
 		{
-			var entries = await timeEntryRepository.GetForWeekAsync(employee.EmployeeId, weekStart, ct);
-			var week = await weekRecordRepository.GetAsync(employee.EmployeeId, weekStart, ct);
+			var entries = entriesByEmployee[employee.EmployeeId].ToList();
+			weekByEmployee.TryGetValue(employee.EmployeeId, out var week);
+			// A deactivated employee only shows up for a week they actually have
+			// data in (e.g. looking back at a week before they left) - otherwise
+			// they'd sit in every future week's "logged nothing" warning forever.
+			if (!employee.IsActive && entries.Count == 0 && week is null) continue;
 			var dayTypeDtos = await dayTypeResolutionService.ResolveWeekAsync(employee.EmployeeId, weekStart, ct);
 
 			var dailyHours = new decimal[7];

@@ -35,7 +35,7 @@ public class WeekApprovalService(
 			e.Task?.Name ?? $"Task #{e.TaskId}", e.Note, e.HoursByDay
 		)).ToList();
 
-		var (errors, warnings) = TimesheetValidator.Validate(weekStartDate, lines, dayTypes, DateOnly.FromDateTime(DateTime.UtcNow));
+		var (errors, warnings) = TimesheetValidator.Validate(weekStartDate, lines, dayTypes);
 		return new WeekValidationResult(errors, warnings);
 	}
 
@@ -107,8 +107,9 @@ public class WeekApprovalService(
 		return ToDto(employeeCode, week);
 	}
 
-	public async Task<WeekRecordDto> ApproveLevel1Async(string employeeCode, DateOnly weekStartDate, string approverEmployeeCode, CancellationToken ct = default)
+	public async Task<WeekRecordDto> ApproveLevel1Async(string employeeCode, DateOnly weekStartDate, string approverEmployeeCode, string? comment = null, CancellationToken ct = default)
 	{
+		comment = NormalizeApprovalComment(comment);
 		var employee = await RequireEmployeeAsync(employeeCode, ct);
 		var week = await weekRecordRepository.GetOrCreateAsync(employee.EmployeeId, weekStartDate, ct);
 		if (week.Status is not WeekStatus.PendingL1)
@@ -120,7 +121,7 @@ public class WeekApprovalService(
 
 		week.Status = WeekStatus.PendingL2;
 		week.UpdatedAt = DateTime.UtcNow;
-		AddEvent(week, $"Level 1 approved — {approver.FullName}", null, ApprovalEventStatus.Ok, approver.EmployeeId);
+		AddEvent(week, $"Level 1 approved — {approver.FullName}", comment, ApprovalEventStatus.Ok, approver.EmployeeId);
 		AddEvent(week,
 			l2Approver is not null ? $"Awaiting Level 2 — {l2Approver.FullName}" : "Awaiting Level 2 — no Level 2 approver on file",
 			"Pending", ApprovalEventStatus.Pending, null);
@@ -129,8 +130,9 @@ public class WeekApprovalService(
 		return ToDto(employeeCode, week);
 	}
 
-	public async Task<WeekRecordDto> ApproveLevel2Async(string employeeCode, DateOnly weekStartDate, string approverEmployeeCode, CancellationToken ct = default)
+	public async Task<WeekRecordDto> ApproveLevel2Async(string employeeCode, DateOnly weekStartDate, string approverEmployeeCode, string? comment = null, CancellationToken ct = default)
 	{
+		comment = NormalizeApprovalComment(comment);
 		var employee = await RequireEmployeeAsync(employeeCode, ct);
 		var week = await weekRecordRepository.GetOrCreateAsync(employee.EmployeeId, weekStartDate, ct);
 		if (week.Status is not WeekStatus.PendingL2)
@@ -141,7 +143,7 @@ public class WeekApprovalService(
 
 		week.Status = WeekStatus.Approved;
 		week.UpdatedAt = DateTime.UtcNow;
-		AddEvent(week, $"Level 2 approved — {approver.FullName}", null, ApprovalEventStatus.Ok, approver.EmployeeId);
+		AddEvent(week, $"Level 2 approved — {approver.FullName}", comment, ApprovalEventStatus.Ok, approver.EmployeeId);
 		AddEvent(week, "Week locked", null, ApprovalEventStatus.Ok, null);
 
 		await weekRecordRepository.SaveChangesAsync(ct);
@@ -154,6 +156,12 @@ public class WeekApprovalService(
 		var week = await weekRecordRepository.GetOrCreateAsync(employee.EmployeeId, weekStartDate, ct);
 		if (week.Status is not (WeekStatus.PendingL1 or WeekStatus.PendingL2))
 			throw new BusinessRuleException("Only a week pending approval can be returned.");
+		// WeekRecord.RejectionReason and ApprovalEvent.EventMeta are NVARCHAR(500)
+		// and NVARCHAR(200) respectively; the reason lands in both.
+		if (string.IsNullOrWhiteSpace(reason))
+			throw new BusinessRuleException("A reason is required when returning a week.");
+		if (reason.Length > 200)
+			throw new BusinessRuleException($"The return reason is {reason.Length} characters - please keep it to 200 or fewer.");
 
 		if (week.Status is WeekStatus.PendingL1)
 			await EnsureIsManagerAsync(employeeCode, approverEmployeeCode, ct);
@@ -308,6 +316,18 @@ public class WeekApprovalService(
 		var routing = await DetermineApprovalRoutingAsync(employeeCode, ct);
 		if (routing.Level2Approver?.EmployeeCode != approverEmployeeCode)
 			throw new BusinessRuleException($"{approverEmployeeCode} is not the Level 2 approver for {employeeCode}.");
+	}
+
+	/// <summary>Blank -> null; checked against ApprovalEvent.EventMeta's
+	/// NVARCHAR(200) so an over-long comment is a clear 400, not a SQL
+	/// truncation error.</summary>
+	private static string? NormalizeApprovalComment(string? comment)
+	{
+		if (string.IsNullOrWhiteSpace(comment)) return null;
+		var trimmed = comment.Trim();
+		if (trimmed.Length > 200)
+			throw new BusinessRuleException("Approval comments are limited to 200 characters.");
+		return trimmed;
 	}
 
 	private static void AddEvent(WeekRecord week, string text, string? meta, ApprovalEventStatus? status, int? actedByEmployeeId) =>

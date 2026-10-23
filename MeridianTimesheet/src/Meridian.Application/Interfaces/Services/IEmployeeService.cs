@@ -32,6 +32,12 @@ public interface IEmployeeService
 	/// AccountId null means "no specific client - company-wide holidays only".</summary>
 	Task SetPrimaryAccountAsync(string employeeCode, int? accountId, CancellationToken ct = default);
 
+	/// <summary>Updates name, email, designation, department and manager.
+	/// Changing the manager takes effect immediately - including for weeks
+	/// already waiting for approval, since approvers are worked out live from
+	/// the reporting line.</summary>
+	Task<EmployeeDto> UpdateEmployeeAsync(string employeeCode, UpdateEmployeeRequest request, CancellationToken ct = default);
+
 	Task DeactivateEmployeeAsync(string employeeCode, string deactivatedByEmployeeCode, CancellationToken ct = default);
 	Task ReactivateEmployeeAsync(string employeeCode, CancellationToken ct = default);
 

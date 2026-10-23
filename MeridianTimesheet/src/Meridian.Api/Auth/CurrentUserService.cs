@@ -45,8 +45,11 @@ public class CurrentUserService : ICurrentUserService
         // Blocking calls are acceptable here — this runs once per request,
         // early, and keeps ICurrentUserService's synchronous property shape
         // that controllers/services depend on throughout.
+        // A deactivated employee resolves to null (-> 401, "not a recognized
+        // employee") so deactivation actually removes access, instead of only
+        // changing a label on the Resources tab.
         var employee = employeeRepository.GetByEntraObjectIdAsync(oid).GetAwaiter().GetResult();
-        if (employee is not null) return employee.EmployeeCode;
+        if (employee is not null) return employee.IsActive ? employee.EmployeeCode : null;
 
         // First sign-in for this Entra identity — no Employee row has this
         // oid yet. Fall back to matching by email/UPN against an existing
@@ -60,6 +63,7 @@ public class CurrentUserService : ICurrentUserService
 
         var matchedByEmail = employeeRepository.GetByCodeOrEmailAsync(email).GetAwaiter().GetResult();
         if (matchedByEmail is null) return null; // No employee record for this Microsoft account - not auto-created.
+        if (!matchedByEmail.IsActive) return null;
 
         matchedByEmail.EntraObjectId = oid;
         employeeRepository.SaveChangesAsync().GetAwaiter().GetResult();

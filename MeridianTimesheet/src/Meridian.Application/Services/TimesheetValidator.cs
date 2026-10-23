@@ -16,8 +16,7 @@ public static class TimesheetValidator
     public static (List<string> Errors, List<string> Warnings) Validate(
         DateOnly weekStartDate,
         IReadOnlyList<ValidationLine> lines,
-        IReadOnlyList<DayType> dayTypes,
-        DateOnly today)
+        IReadOnlyList<DayType> dayTypes)
     {
         var errors = new List<string>();
         var warnings = new List<string>();
@@ -43,6 +42,9 @@ public static class TimesheetValidator
         {
             if (line.HoursByDay.Sum() == 0)
                 errors.Add($"Line \"{line.TaskName}\" has no hours — remove it or enter hours.");
+
+            if (line.HoursByDay.Any(hours => hours > TimeEntryRules.MaxHoursPerLinePerDay))
+                errors.Add($"Line \"{line.TaskName}\" has more than {TimeEntryRules.MaxHoursPerLinePerDay:0.##} h on one day — split it into separate lines.");
         }
 
         for (var i = 0; i < 7; i++)
@@ -53,11 +55,12 @@ public static class TimesheetValidator
             if (dayTotals[i] > 0 && capacity[i] == 0)
                 errors.Add($"{label} is marked {dayTypes[i]} but has {dayTotals[i]:0.##} h logged.");
 
-            if (capacity[i] > 0 && dayTotals[i] == 0 && date <= today)
-                warnings.Add($"{label} has no hours against {capacity[i]:0.##} h capacity.");
-
-            if (capacity[i] > 0 && dayTotals[i] > capacity[i])
-                warnings.Add($"{label} logged {dayTotals[i]:0.##} h against {capacity[i]:0.##} h capacity.");
+            // Same rule the My Timesheet screen applies before enabling Submit:
+            // every working day must total exactly its capacity (8 h, or 4 h on
+            // a half-day leave) - now also enforced here so no route around the
+            // screen (e.g. Excel import) can submit an unbalanced week.
+            if (capacity[i] > 0 && dayTotals[i] != capacity[i])
+                errors.Add($"{label} has {dayTotals[i]:0.##} h logged — it must be exactly {capacity[i]:0.##} h.");
         }
 
         foreach (var line in lines)
@@ -65,10 +68,6 @@ public static class TimesheetValidator
             if (line.HoursByDay.Sum() >= 8 && string.IsNullOrWhiteSpace(line.Note))
                 warnings.Add($"\"{line.TaskName}\" has {line.HoursByDay.Sum():0.##} h with no description.");
         }
-
-        var capacityTotal = capacity.Sum();
-        if (total < capacityTotal)
-            warnings.Add($"Total {total:0.##} h is below available capacity of {capacityTotal:0.##} h.");
 
         return (errors, warnings);
     }

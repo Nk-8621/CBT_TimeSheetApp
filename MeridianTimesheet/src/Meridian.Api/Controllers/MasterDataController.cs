@@ -159,6 +159,38 @@ public class MasterDataController(IMasterDataService masterDataService, ICurrent
 		return Ok(await masterDataService.UpdateTaskAsync(taskId, request, ct));
 	}
 
+	[HttpGet("modules/{moduleId:int}/usage")]
+	public async Task<IActionResult> GetModuleUsage(int moduleId, CancellationToken ct)
+	{
+		if (!currentUser.IsAdmin) return Forbid();
+		return Ok(await masterDataService.GetModuleUsageAsync(moduleId, ct));
+	}
+
+	/// <summary>Only while no timesheet line uses the module - otherwise 400
+	/// with a message saying how many lines use it.</summary>
+	[HttpDelete("modules/{moduleId:int}")]
+	public async Task<IActionResult> DeleteModule(int moduleId, CancellationToken ct)
+	{
+		if (!currentUser.IsAdmin) return Forbid();
+		await masterDataService.DeleteModuleAsync(moduleId, ct);
+		return NoContent();
+	}
+
+	[HttpGet("tasks/{taskId:int}/usage")]
+	public async Task<IActionResult> GetTaskUsage(int taskId, CancellationToken ct)
+	{
+		if (!currentUser.IsAdmin) return Forbid();
+		return Ok(await masterDataService.GetTaskUsageAsync(taskId, ct));
+	}
+
+	[HttpDelete("tasks/{taskId:int}")]
+	public async Task<IActionResult> DeleteTask(int taskId, CancellationToken ct)
+	{
+		if (!currentUser.IsAdmin) return Forbid();
+		await masterDataService.DeleteTaskAsync(taskId, ct);
+		return NoContent();
+	}
+
 	[HttpPost("holidays")]
 	public async Task<IActionResult> CreateHoliday([FromBody] CreateHolidayRequest request, CancellationToken ct)
 	{

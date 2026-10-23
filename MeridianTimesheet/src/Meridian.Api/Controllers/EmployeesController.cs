@@ -77,6 +77,14 @@ public class EmployeesController(IEmployeeService employeeService, IAccessContro
 		return Ok(employee);
 	}
 
+	/// <summary>Edits name, email, designation, department and manager. Admin-only.</summary>
+	[HttpPut("{employeeCode}")]
+	public async Task<IActionResult> Update(string employeeCode, [FromBody] UpdateEmployeeRequest request, CancellationToken ct)
+	{
+		if (!currentUser.IsAdmin) return Forbid();
+		return Ok(await employeeService.UpdateEmployeeAsync(employeeCode, request, ct));
+	}
+
 	[HttpPut("{employeeCode}/primary-account")]
 	public async Task<IActionResult> SetPrimaryAccount(string employeeCode, [FromBody] SetPrimaryAccountRequest request, CancellationToken ct)
 	{
