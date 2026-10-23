@@ -1,6 +1,9 @@
 namespace Meridian.Application.DTOs;
 
 public record DepartmentDto(int Id, string Code, string Name, int? ParentDepartmentId);
+/// <summary>Create and edit both send every field - the form always shows all
+/// three. ParentDepartmentId null = a top-level department.</summary>
+public record SaveDepartmentRequest(string Code, string Name, int? ParentDepartmentId);
 public record LocationDto(int Id, string Code, string Name);
 public record AccountDto(int Id, int DepartmentId, string Name, string AccountType);
 

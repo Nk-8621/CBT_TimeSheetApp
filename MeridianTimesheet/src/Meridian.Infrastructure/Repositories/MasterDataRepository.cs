@@ -90,6 +90,9 @@ public class MasterDataRepository(MeridianDbContext db) : IMasterDataRepository
 		await db.Modules.Where(m => m.ProjectTypeId == projectTypeId).ToListAsync(ct);
 
 	// ---- Get by ID (tracked - the service mutates these directly for updates) ----
+	public Task<Department?> GetDepartmentByIdAsync(int departmentId, CancellationToken ct = default) =>
+		db.Departments.FirstOrDefaultAsync(d => d.DepartmentId == departmentId, ct);
+
 	public Task<Account?> GetAccountByIdAsync(int accountId, CancellationToken ct = default) =>
 		db.Accounts.FirstOrDefaultAsync(a => a.AccountId == accountId, ct);
 
@@ -114,6 +117,9 @@ public class MasterDataRepository(MeridianDbContext db) : IMasterDataRepository
 		db.Holidays.FirstOrDefaultAsync(h => h.HolidayId == holidayId, ct);
 
 	// ---- Mutations ----
+	public async Task AddDepartmentAsync(Department department, CancellationToken ct = default) =>
+		await db.Departments.AddAsync(department, ct);
+
 	public async Task AddAccountAsync(Account account, CancellationToken ct = default) =>
 		await db.Accounts.AddAsync(account, ct);
 

@@ -14,6 +14,11 @@
 -- plus two pending leave requests for TEST001 next week
 --                                                    -> CBT1268 "Request Approval"
 -- The test employees also show on Team Compliance, Reports and Master Data.
+-- Each week has one Billable, one PartialBillable and one NonBillable line
+-- (on 3 different projects) so the billable split can be checked:
+--   TEST001  50% billable / 25% partial / 25% non-billable
+--   TEST002  25% billable / 50% partial / 25% non-billable
+-- Safe to re-run: allocations and this week's lines are rewritten each time.
 --
 -- Rows are written exactly the way the app writes them (see
 -- WeekApprovalService.SubmitAsync / ApproveLevel1Async and
@@ -45,22 +50,41 @@ END
 IF @ApproverManagerId IS NULL
     PRINT 'NOTE: CBT1268 has no manager, so TEST001''s week will route straight to Level 2 instead of Level 1.';
 
--- ---- A real project / module / tasks to log against ---------------------
-DECLARE @ProjectId int, @ModuleId int, @TaskA int, @TaskB int, @Classification nvarchar(20);
-SELECT TOP 1 @ProjectId = p.ProjectId, @ModuleId = m.ModuleId, @Classification = p.DefaultBillable
-FROM Carbynetech_Project p
-JOIN Carbynetech_Module m ON m.ProjectId = p.ProjectId
-WHERE p.IsActive = 1
-  AND EXISTS (SELECT 1 FROM Carbynetech_Task t WHERE t.ModuleId = m.ModuleId)
-ORDER BY (SELECT COUNT(*) FROM Carbynetech_Task t WHERE t.ModuleId = m.ModuleId) DESC, p.ProjectId;
+-- ---- Three real projects, one per billing classification -------------------
+-- The billing type of a line comes from the employee's allocation to that
+-- project (one classification per employee+project), so each type needs its
+-- own project. Picks 3 active projects that each have a module with a task.
+DECLARE @Picks TABLE (Slot int PRIMARY KEY, ProjectId int, ModuleId int, TaskId int);
+INSERT INTO @Picks (Slot, ProjectId, ModuleId, TaskId)
+SELECT TOP 3 ROW_NUMBER() OVER (ORDER BY x.ProjectId), x.ProjectId, x.ModuleId, x.TaskId
+FROM (
+    SELECT p.ProjectId, m.ModuleId, t.TaskId,
+           ROW_NUMBER() OVER (PARTITION BY p.ProjectId ORDER BY m.ModuleId, t.TaskId) AS rn
+    FROM Carbynetech_Project p
+    JOIN Carbynetech_Module m ON m.ProjectId = p.ProjectId
+    JOIN Carbynetech_Task t ON t.ModuleId = m.ModuleId
+    WHERE p.IsActive = 1
+) x
+WHERE x.rn = 1
+ORDER BY x.ProjectId;
 
-SELECT @TaskA = MIN(TaskId), @TaskB = MAX(TaskId) FROM Carbynetech_Task WHERE ModuleId = @ModuleId;
-
-IF @ProjectId IS NULL
+IF (SELECT COUNT(*) FROM @Picks) < 3
 BEGIN
-    PRINT 'ERROR: no active project with a module and a task - nothing changed.';
+    PRINT 'ERROR: need 3 active projects that each have a module with a task - nothing changed.';
     RETURN;
 END
+
+-- Hours per day (Mon-Fri) and billing category for each line.
+--   TEST001: Billable 4 h (AMS) + Partial 2 h + NonBillable 2 h (OH) = 50% / 25% / 25%
+--   TEST002: Billable 2 h (T&M) + Partial 4 h + NonBillable 2 h (OH) = 25% / 50% / 25%
+DECLARE @Lines TABLE (EmployeeCode nvarchar(15), Slot int, Classification nvarchar(20), BillingCategory nvarchar(10), DailyHours decimal(4,2));
+INSERT INTO @Lines VALUES
+    ('TEST001', 1, 'Billable',        'AMS', 4),
+    ('TEST001', 2, 'PartialBillable', NULL,  2),
+    ('TEST001', 3, 'NonBillable',     'OH',  2),
+    ('TEST002', 1, 'Billable',        'T&M', 2),
+    ('TEST002', 2, 'PartialBillable', NULL,  4),
+    ('TEST002', 3, 'NonBillable',     'OH',  2);
 
 BEGIN TRANSACTION;
 
@@ -103,21 +127,30 @@ BEGIN
     RETURN;
 END
 
--- Project allocation (so their timesheet screens make sense too).
-INSERT INTO Carbynetech_EmployeeProjectAllocation (EmployeeId, ProjectId, AssignedAt, Classification, BillingCategory)
-SELECT e.Id, @ProjectId, @Now, @Classification, NULL
-FROM (VALUES (@Test1Id), (@Test2Id)) e(Id)
-WHERE NOT EXISTS (SELECT 1 FROM Carbynetech_EmployeeProjectAllocation a WHERE a.EmployeeId = e.Id AND a.ProjectId = @ProjectId);
+-- ---- Project allocations + timesheet lines --------------------------------
+-- Replaced on every run (test employees only), so re-running this script
+-- after an earlier version updates their data instead of skipping it.
+DECLARE @TestEmployees TABLE (EmployeeCode nvarchar(15) PRIMARY KEY, EmployeeId int);
+INSERT INTO @TestEmployees VALUES ('TEST001', @Test1Id), ('TEST002', @Test2Id);
 
--- ---- Timesheet lines: 2 lines x 4 h, Mon-Fri = 40 h each -------------------
+DELETE FROM Carbynetech_EmployeeProjectAllocation WHERE EmployeeId IN (@Test1Id, @Test2Id);
+INSERT INTO Carbynetech_EmployeeProjectAllocation (EmployeeId, ProjectId, AssignedAt, Classification, BillingCategory)
+SELECT te.EmployeeId, pk.ProjectId, @Now, l.Classification, l.BillingCategory
+FROM @Lines l
+JOIN @TestEmployees te ON te.EmployeeCode = l.EmployeeCode
+JOIN @Picks pk ON pk.Slot = l.Slot;
+
+DELETE FROM Carbynetech_TimeEntry WHERE EmployeeId IN (@Test1Id, @Test2Id) AND WeekStartDate = @WeekStart;
 INSERT INTO Carbynetech_TimeEntry
     (EmployeeId, WeekStartDate, ProjectId, ModuleId, TaskId, Classification, BillingCategory, Note,
      MondayHours, TuesdayHours, WednesdayHours, ThursdayHours, FridayHours, SaturdayHours, SundayHours, CreatedAt)
-SELECT e.Id, @WeekStart, @ProjectId, @ModuleId, l.TaskId, @Classification, NULL, l.Note,
-       4, 4, 4, 4, 4, 0, 0, @Now
-FROM (VALUES (@Test1Id), (@Test2Id)) e(Id)
-CROSS JOIN (VALUES (@TaskA, N'Dummy test data - line 1'), (@TaskB, N'Dummy test data - line 2')) l(TaskId, Note)
-WHERE NOT EXISTS (SELECT 1 FROM Carbynetech_TimeEntry t WHERE t.EmployeeId = e.Id AND t.WeekStartDate = @WeekStart);
+SELECT te.EmployeeId, @WeekStart, pk.ProjectId, pk.ModuleId, pk.TaskId, l.Classification, l.BillingCategory,
+       CONCAT(N'Dummy test data - ', l.Classification),
+       l.DailyHours, l.DailyHours, l.DailyHours, l.DailyHours, l.DailyHours, 0, 0, @Now
+FROM @Lines l
+JOIN @TestEmployees te ON te.EmployeeCode = l.EmployeeCode
+JOIN @Picks pk ON pk.Slot = l.Slot;
+PRINT CONCAT(@@ROWCOUNT, ' timesheet line(s) written (Billable / PartialBillable / NonBillable).');
 
 -- ---- Week records + approval trail -------------------------------------
 DECLARE @Week1Id int, @Week2Id int;
@@ -162,14 +195,28 @@ WHERE NOT EXISTS (SELECT 1 FROM Carbynetech_DayTypeRequest d WHERE d.EmployeeId 
 COMMIT TRANSACTION;
 
 -- ---- Summary ---------------------------------------------------------------
-PRINT CONCAT('Done. Week of ', CONVERT(char(10), @WeekStart, 120), ', project ', @ProjectId, ', module ', @ModuleId, '.');
-SELECT e.EmployeeCode, e.FullName, m.EmployeeCode AS ManagerCode, w.WeekStartDate, w.Status,
-       (SELECT SUM(MondayHours + TuesdayHours + WednesdayHours + ThursdayHours + FridayHours + SaturdayHours + SundayHours)
-        FROM Carbynetech_TimeEntry t WHERE t.EmployeeId = e.EmployeeId AND t.WeekStartDate = w.WeekStartDate) AS TotalHours
+PRINT CONCAT('Done. Week of ', CONVERT(char(10), @WeekStart, 120), '.');
+
+-- Expected Team Compliance split per person (compare with the screen).
+SELECT e.EmployeeCode, e.FullName, m.EmployeeCode AS ManagerCode, w.Status,
+       SUM(t.MondayHours + t.TuesdayHours + t.WednesdayHours + t.ThursdayHours + t.FridayHours + t.SaturdayHours + t.SundayHours) AS TotalHours,
+       SUM(CASE WHEN t.Classification = 'Billable'        THEN t.MondayHours + t.TuesdayHours + t.WednesdayHours + t.ThursdayHours + t.FridayHours + t.SaturdayHours + t.SundayHours ELSE 0 END) AS BillableHours,
+       SUM(CASE WHEN t.Classification = 'PartialBillable' THEN t.MondayHours + t.TuesdayHours + t.WednesdayHours + t.ThursdayHours + t.FridayHours + t.SaturdayHours + t.SundayHours ELSE 0 END) AS PartialBillableHours,
+       SUM(CASE WHEN t.Classification = 'NonBillable'     THEN t.MondayHours + t.TuesdayHours + t.WednesdayHours + t.ThursdayHours + t.FridayHours + t.SaturdayHours + t.SundayHours ELSE 0 END) AS NonBillableHours
 FROM Carbynetech_Employee e
 LEFT JOIN Carbynetech_Employee m ON m.EmployeeId = e.ManagerEmployeeId
 LEFT JOIN Carbynetech_WeekRecord w ON w.EmployeeId = e.EmployeeId AND w.WeekStartDate = @WeekStart
-WHERE e.EmployeeCode IN ('TEST001', 'TEST002');
+LEFT JOIN Carbynetech_TimeEntry t ON t.EmployeeId = e.EmployeeId AND t.WeekStartDate = @WeekStart
+WHERE e.EmployeeCode IN ('TEST001', 'TEST002')
+GROUP BY e.EmployeeCode, e.FullName, m.EmployeeCode, w.Status;
+
+-- The lines themselves.
+SELECT e.EmployeeCode, p.Code AS ProjectCode, t.Classification, t.BillingCategory, t.MondayHours AS HoursPerDay
+FROM Carbynetech_TimeEntry t
+JOIN Carbynetech_Employee e ON e.EmployeeId = t.EmployeeId
+JOIN Carbynetech_Project p ON p.ProjectId = t.ProjectId
+WHERE e.EmployeeCode IN ('TEST001', 'TEST002') AND t.WeekStartDate = @WeekStart
+ORDER BY e.EmployeeCode, t.Classification;
 
 SELECT d.RequestDate, d.RequestType, d.Status
 FROM Carbynetech_DayTypeRequest d

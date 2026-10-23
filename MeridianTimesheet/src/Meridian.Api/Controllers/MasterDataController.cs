@@ -7,11 +7,11 @@ namespace Meridian.Api.Controllers;
 
 /// <summary>Reference data for the frontend's dropdowns/filters (open to any
 /// authenticated user) plus the Master Data admin screen's mutations
-/// (Accounts/Projects/Modules/Tasks/Holidays/Project Types - Admin role
-/// only). The "Others" quick-add endpoints are the one exception - any
-/// authenticated employee can call those from Add Task Line, not just
-/// admins. Departments/Locations stay read-only everywhere: they're sourced
-/// from the real org chart, not something this application should hand-edit.</summary>
+/// (Departments/Accounts/Projects/Modules/Tasks/Holidays/Project Types -
+/// Admin role only). The "Others" quick-add endpoints are the one exception -
+/// any authenticated employee can call those from Add Task Line, not just
+/// admins. Locations stay read-only. Departments can be added and edited
+/// but not deleted, because employees, accounts and projects point at them.</summary>
 [ApiController]
 [Route("api/masterdata")]
 [Authorize]
@@ -93,6 +93,20 @@ public class MasterDataController(IMasterDataService masterDataService, ICurrent
 		Ok(await masterDataService.QuickAddTaskAsync(request, ct));
 
 	// ---- Mutations (Admin role only) ----
+
+	[HttpPost("departments")]
+	public async Task<IActionResult> CreateDepartment([FromBody] SaveDepartmentRequest request, CancellationToken ct)
+	{
+		if (!currentUser.IsAdmin) return Forbid();
+		return Ok(await masterDataService.CreateDepartmentAsync(request, ct));
+	}
+
+	[HttpPut("departments/{departmentId:int}")]
+	public async Task<IActionResult> UpdateDepartment(int departmentId, [FromBody] SaveDepartmentRequest request, CancellationToken ct)
+	{
+		if (!currentUser.IsAdmin) return Forbid();
+		return Ok(await masterDataService.UpdateDepartmentAsync(departmentId, request, ct));
+	}
 
 	[HttpPost("accounts")]
 	public async Task<IActionResult> CreateAccount([FromBody] CreateAccountRequest request, CancellationToken ct)

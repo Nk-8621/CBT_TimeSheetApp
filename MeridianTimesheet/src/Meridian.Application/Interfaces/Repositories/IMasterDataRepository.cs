@@ -35,6 +35,7 @@ public interface IMasterDataRepository
 	Task<IReadOnlyList<Module>> GetModulesByProjectTypeIdAsync(int projectTypeId, CancellationToken ct = default);
 
 	// ---- Get by ID (tracked - needed before an update) ----
+	Task<Department?> GetDepartmentByIdAsync(int departmentId, CancellationToken ct = default);
 	Task<Account?> GetAccountByIdAsync(int accountId, CancellationToken ct = default);
 	Task<Account?> GetAccountByNameAsync(string name, CancellationToken ct = default);
 	Task<Project?> GetProjectByIdAsync(int projectId, CancellationToken ct = default);
@@ -43,6 +44,7 @@ public interface IMasterDataRepository
 	Task<Holiday?> GetHolidayByIdAsync(int holidayId, CancellationToken ct = default);
 
 	// ---- Mutations ----
+	Task AddDepartmentAsync(Department department, CancellationToken ct = default);
 	Task AddAccountAsync(Account account, CancellationToken ct = default);
 	Task AddProjectAsync(Project project, CancellationToken ct = default);
 	Task AddModuleAsync(Module module, CancellationToken ct = default);

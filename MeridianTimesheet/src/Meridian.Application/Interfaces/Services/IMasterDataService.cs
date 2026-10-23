@@ -32,6 +32,9 @@ public interface IMasterDataService
 	Task<ProjectTypeTaskTemplateDto> UpdateTaskTemplateAsync(int taskTemplateId, UpdateProjectTypeTaskTemplateRequest request, CancellationToken ct = default);
 	Task DeleteTaskTemplateAsync(int taskTemplateId, CancellationToken ct = default);
 
+	Task<DepartmentDto> CreateDepartmentAsync(SaveDepartmentRequest request, CancellationToken ct = default);
+	Task<DepartmentDto> UpdateDepartmentAsync(int departmentId, SaveDepartmentRequest request, CancellationToken ct = default);
+
 	Task<AccountDto> CreateAccountAsync(CreateAccountRequest request, CancellationToken ct = default);
 	Task<AccountDto> UpdateAccountAsync(int accountId, UpdateAccountRequest request, CancellationToken ct = default);
 

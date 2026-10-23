@@ -210,6 +210,84 @@ public class MasterDataService(IMasterDataRepository repository, ITimeEntryRepos
 		await repository.SaveChangesAsync(ct);
 	}
 
+	// ---- Department ----
+
+	public async Task<DepartmentDto> CreateDepartmentAsync(SaveDepartmentRequest request, CancellationToken ct = default)
+	{
+		var (code, name) = await ValidateDepartmentAsync(null, request, ct);
+
+		var department = new Department
+		{
+			Code = code,
+			Name = name,
+			ParentDepartmentId = request.ParentDepartmentId,
+			CreatedAt = DateTime.UtcNow,
+		};
+		await repository.AddDepartmentAsync(department, ct);
+		await repository.SaveChangesAsync(ct);
+		return ToDto(department);
+	}
+
+	public async Task<DepartmentDto> UpdateDepartmentAsync(int departmentId, SaveDepartmentRequest request, CancellationToken ct = default)
+	{
+		var department = await repository.GetDepartmentByIdAsync(departmentId, ct)
+			?? throw new EntityNotFoundException(nameof(Department), departmentId);
+
+		var (code, name) = await ValidateDepartmentAsync(departmentId, request, ct);
+
+		department.Code = code;
+		department.Name = name;
+		department.ParentDepartmentId = request.ParentDepartmentId;
+		department.UpdatedAt = DateTime.UtcNow;
+
+		await repository.SaveChangesAsync(ct);
+		return ToDto(department);
+	}
+
+	/// <summary>Checks a create/edit and returns the cleaned-up code (upper
+	/// case) and name. Departments nest only one level deep (e.g. "SAP" >
+	/// "SAP > Technical"), so a parent must itself be top-level, and a
+	/// department that already has sub-departments can't be put under another.
+	/// departmentId is null for a new department.</summary>
+	private async Task<(string Code, string Name)> ValidateDepartmentAsync(int? departmentId, SaveDepartmentRequest request, CancellationToken ct)
+	{
+		var code = request.Code?.Trim().ToUpperInvariant() ?? "";
+		var name = request.Name?.Trim() ?? "";
+
+		if (code.Length == 0 || name.Length == 0)
+			throw new BusinessRuleException("Department code and name are both required.");
+		if (code.Length > 30)
+			throw new BusinessRuleException("Department code can be at most 30 characters.");
+		if (name.Length > 100)
+			throw new BusinessRuleException("Department name can be at most 100 characters.");
+
+		var departments = await repository.GetDepartmentsAsync(ct);
+		var others = departments.Where(d => d.DepartmentId != departmentId).ToList();
+
+		if (others.Any(d => string.Equals(d.Code, code, StringComparison.OrdinalIgnoreCase)))
+			throw new BusinessRuleException($"Another department already uses the code \"{code}\".");
+
+		if (request.ParentDepartmentId is int parentId)
+		{
+			if (parentId == departmentId)
+				throw new BusinessRuleException("A department can't be its own parent.");
+
+			var parent = others.FirstOrDefault(d => d.DepartmentId == parentId)
+				?? throw new EntityNotFoundException(nameof(Department), parentId);
+			if (parent.ParentDepartmentId is not null)
+				throw new BusinessRuleException($"\"{parent.Name}\" is already a sub-department, so it can't have sub-departments of its own.");
+
+			var hasChildren = departmentId is not null && departments.Any(d => d.ParentDepartmentId == departmentId);
+			if (hasChildren)
+				throw new BusinessRuleException("This department has sub-departments, so it can't be placed under another department.");
+		}
+
+		return (code, name);
+	}
+
+	private static DepartmentDto ToDto(Department department) =>
+		new(department.DepartmentId, department.Code, department.Name, department.ParentDepartmentId);
+
 	// ---- Account ----
 
 	public async Task<AccountDto> CreateAccountAsync(CreateAccountRequest request, CancellationToken ct = default)
