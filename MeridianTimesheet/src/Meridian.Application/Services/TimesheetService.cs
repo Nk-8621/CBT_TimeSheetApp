@@ -115,6 +115,7 @@ public class TimesheetService(
 			throw new BusinessRuleException("A description is required for this task line.");
 		EnsureNoteLength(request.Note);
 		TimeEntryRules.ValidateHours(request.HoursByDay);
+		await EnsureDayLimitsAsync(employee.EmployeeId, weekStartDate, null, new decimal[7], request.HoursByDay, ct);
 		await EnsureValidHierarchyAsync(request.ProjectId, request.ModuleId, request.TaskId, requireActiveProject: true, ct);
 
 		// Classification/BillingCategory are set by the admin at project-
@@ -220,6 +221,7 @@ public class TimesheetService(
 		if (request.HoursByDay is decimal[] hours)
 		{
 			TimeEntryRules.ValidateHours(hours);
+			await EnsureDayLimitsAsync(employee.EmployeeId, entry.WeekStartDate, entry.TimeEntryId, entry.HoursByDay, hours, ct);
 			entry.HoursByDay = hours;
 		}
 		entry.UpdatedAt = DateTime.UtcNow;
@@ -309,6 +311,33 @@ public class TimesheetService(
 	}
 
 	// ---- Shared helpers ----
+
+	/// <summary>A day can never hold more than its available hours (8 h, 4 h on
+	/// a half-day leave, 0 on leave / holiday / weekly off) across all lines.
+	/// Only days where this line's hours go UP are checked, so reducing or
+	/// moving hours on an existing line is always allowed.</summary>
+	private async Task EnsureDayLimitsAsync(int employeeId, DateOnly weekStartDate, int? excludeEntryId, decimal[] oldHours, decimal[] newHours, CancellationToken ct)
+	{
+		var entries = await timeEntryRepository.GetForWeekAsync(employeeId, weekStartDate, ct);
+		var dayTypes = await dayTypeResolutionService.ResolveWeekAsync(employeeId, weekStartDate, ct);
+
+		for (var i = 0; i < 7; i++)
+		{
+			if (newHours[i] <= oldHours[i]) continue;
+
+			var otherLinesTotal = entries
+				.Where(e => e.TimeEntryId != excludeEntryId)
+				.Sum(e => e.HoursByDay[i]);
+			var capacity = dayTypes[i].CapacityHours;
+			if (otherLinesTotal + newHours[i] <= capacity) continue;
+
+			var left = Math.Max(0m, capacity - otherLinesTotal);
+			var label = dayTypes[i].Date.ToString("ddd d MMM");
+			throw new BusinessRuleException(left == 0
+				? $"{label} is already full ({capacity:0.##} h). Edit an existing line instead of adding more hours."
+				: $"{label} has only {left:0.##} h left (a day can hold at most {capacity:0.##} h).");
+		}
+	}
 
 	private async Task<Employee> RequireEmployeeAsync(string employeeCode, CancellationToken ct) =>
 		await employeeRepository.GetByCodeAsync(employeeCode, ct)

@@ -5,14 +5,14 @@ namespace Meridian.Application.Common;
 /// <summary>
 /// Rules for the hours on a single timesheet line. The My Timesheet screen
 /// already applies these while typing (EntryDrawer / WeekGrid cap each day
-/// at 4 h); they're repeated here so every route that saves a line - the
+/// at 8 h); they're repeated here so every route that saves a line - the
 /// screen, the Excel import, or a direct API call - follows the same rule.
 /// </summary>
 public static class TimeEntryRules
 {
     /// <summary>One task line can hold at most this many hours on one day.
     /// More work on the same task that day goes on a separate line.</summary>
-    public const decimal MaxHoursPerLinePerDay = 4m;
+    public const decimal MaxHoursPerLinePerDay = 8m;
 
     private static readonly string[] DayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
