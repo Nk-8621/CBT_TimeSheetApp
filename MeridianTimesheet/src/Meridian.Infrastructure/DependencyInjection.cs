@@ -28,6 +28,7 @@ public static class DependencyInjection
         services.AddScoped<IDayTypeRequestRepository, DayTypeRequestRepository>();
         services.AddScoped<ILeaveRepository, LeaveRepository>();
 		services.AddScoped<INotificationRepository, NotificationRepository>();
+		services.AddScoped<IUserStoryRepository, UserStoryRepository>();
 
 		return services;
     }

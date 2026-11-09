@@ -33,6 +33,7 @@ public class MeridianDbContext(DbContextOptions<MeridianDbContext> options) : Db
     public DbSet<LeaveRecord> LeaveRecords => Set<LeaveRecord>();
 
     public DbSet<TimeEntry> TimeEntries => Set<TimeEntry>();
+    public DbSet<UserStory> UserStories => Set<UserStory>();
     public DbSet<DayTypeOverride> DayTypeOverrides => Set<DayTypeOverride>();
     public DbSet<DayTypeRequest> DayTypeRequests => Set<DayTypeRequest>();
     public DbSet<WeekRecord> WeekRecords => Set<WeekRecord>();
@@ -62,6 +63,7 @@ public class MeridianDbContext(DbContextOptions<MeridianDbContext> options) : Db
         modelBuilder.ApplyConfiguration(new LeaveRecordConfiguration());
 
         modelBuilder.ApplyConfiguration(new TimeEntryConfiguration());
+        modelBuilder.ApplyConfiguration(new UserStoryConfiguration());
         modelBuilder.ApplyConfiguration(new DayTypeOverrideConfiguration());
         modelBuilder.ApplyConfiguration(new DayTypeRequestConfiguration());
         modelBuilder.ApplyConfiguration(new WeekRecordConfiguration());

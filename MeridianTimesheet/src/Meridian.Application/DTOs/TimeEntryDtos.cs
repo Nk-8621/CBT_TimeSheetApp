@@ -10,7 +10,9 @@ public record TimeEntryDto(
     string Classification,
     string? BillingCategory,
     string? Note,
-    decimal[] HoursByDay // Monday..Sunday
+    decimal[] HoursByDay, // Monday..Sunday
+    int? UserStoryId = null,      // set when this line is a task under a user story
+    string? UserStoryName = null
 );
 
 public record CreateTimeEntryRequest(
@@ -30,7 +32,8 @@ public record UpdateTimeEntryRequest(
     string? Classification,
     string? BillingCategory,
     string? Note,
-    decimal[]? HoursByDay
+    decimal[]? HoursByDay,
+    int? UserStoryId = null // move a story task to another of the employee's user stories
 );
 
 public record DayTypeDto(DateOnly Date, string DayType, decimal CapacityHours,

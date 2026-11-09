@@ -19,6 +19,11 @@ public class TimeEntry
     public string? BillingCategory { get; set; }
     public string? Note { get; set; }
 
+    /// <summary>The user story this line (task) belongs to. Null for lines
+    /// added the older way (Project › Module › Task picked by hand, Excel
+    /// import). For a story line, Note holds the task name.</summary>
+    public int? UserStoryId { get; set; }
+
     public decimal MondayHours { get; set; }
     public decimal TuesdayHours { get; set; }
     public decimal WednesdayHours { get; set; }
@@ -34,6 +39,7 @@ public class TimeEntry
     public Project? Project { get; set; }
     public Module? Module { get; set; }
     public WorkTask? Task { get; set; }
+    public UserStory? UserStory { get; set; }
 
     /// <summary>Convenience accessor — Monday..Sunday as an array, matching how the UI works with a week.</summary>
     public decimal[] HoursByDay

@@ -20,6 +20,7 @@ builder.Services.AddScoped<IEmployeeService, EmployeeService>();
 builder.Services.AddScoped<IMasterDataService, MasterDataService>();
 //builder.Services.AddScoped<IMasterDataAdminService, MasterDataAdminService>();
 builder.Services.AddScoped<ITimesheetService, TimesheetService>();
+builder.Services.AddScoped<IUserStoryService, UserStoryService>();
 builder.Services.AddScoped<IWeekApprovalService, WeekApprovalService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<ITeamService, TeamService>();

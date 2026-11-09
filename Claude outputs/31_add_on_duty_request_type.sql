@@ -1,5 +1,7 @@
 -- =====================================================================
--- 28_add_on_duty_request_type.sql
+-- 31_add_on_duty_request_type.sql
+--   (renumbered from 28 - that number was already used by
+--    28_test_approval_chain_cbt1267_cbt1268.sql)
 --
 -- Allows 'OnDuty' as a Carbynetech_DayTypeRequest.RequestType, backing the
 -- new "On Duty" option on the Requests screen (a full 8h working day spent

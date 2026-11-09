@@ -35,6 +35,14 @@ public class TimesheetController(ITimesheetService timesheetService, ICurrentUse
 		return CreatedAtAction(nameof(GetWeek), new { employeeCode, weekStart = weekStart.ToString("yyyy-MM-dd") }, created);
 	}
 
+	[HttpPost("{employeeCode}/{weekStart}/story-tasks")]
+	public async Task<IActionResult> AddStoryTask(string employeeCode, DateOnly weekStart, [FromBody] CreateStoryTaskRequest request, CancellationToken ct)
+	{
+		if (EnsureSelfOrAdmin(employeeCode) is IActionResult denied) return denied;
+		var created = await timesheetService.AddStoryTaskAsync(employeeCode, weekStart, request, ct);
+		return CreatedAtAction(nameof(GetWeek), new { employeeCode, weekStart = weekStart.ToString("yyyy-MM-dd") }, created);
+	}
+
 	[HttpPut("entries/{timeEntryId:int}")]
 	public async Task<IActionResult> UpdateEntry(int timeEntryId, [FromBody] UpdateTimeEntryRequest request, CancellationToken ct)
 	{

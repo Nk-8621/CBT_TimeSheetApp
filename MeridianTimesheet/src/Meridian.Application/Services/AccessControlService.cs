@@ -49,7 +49,8 @@ public class AccessControlService(IEmployeeRepository employeeRepository) : IAcc
 		}
 
 		var nav = new List<string>();
-		if (requiresTimesheet) { nav.Add("ts"); nav.Add("hist"); }
+		// User Stories sits with My Timesheet: it is where timesheet tasks are added.
+		if (requiresTimesheet) { nav.Add("stories"); nav.Add("ts"); nav.Add("hist"); }
 		// WFH/Leave requests: everyone who fills a timesheet can ask for one -
 		// including a manager asking for their own, which goes to their own
 		// manager exactly like a normal approval does.

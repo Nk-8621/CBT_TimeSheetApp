@@ -35,6 +35,21 @@ public class TimeEntryConfiguration : IEntityTypeConfiguration<TimeEntry>
         builder.HasOne(t => t.Project).WithMany().HasForeignKey(t => t.ProjectId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(t => t.Module).WithMany().HasForeignKey(t => t.ModuleId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(t => t.Task).WithMany().HasForeignKey(t => t.TaskId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(t => t.UserStory).WithMany().HasForeignKey(t => t.UserStoryId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+public class UserStoryConfiguration : IEntityTypeConfiguration<UserStory>
+{
+    public void Configure(EntityTypeBuilder<UserStory> builder)
+    {
+        builder.ToTable("Carbynetech_UserStory");
+        builder.HasKey(s => s.UserStoryId);
+        builder.Property(s => s.Name).HasMaxLength(200).IsRequired();
+        builder.HasIndex(s => s.EmployeeId);
+
+        builder.HasOne(s => s.Employee).WithMany().HasForeignKey(s => s.EmployeeId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(s => s.Project).WithMany().HasForeignKey(s => s.ProjectId).OnDelete(DeleteBehavior.Restrict);
     }
 }
 

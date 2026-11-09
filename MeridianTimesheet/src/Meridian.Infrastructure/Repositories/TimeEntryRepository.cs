@@ -12,12 +12,14 @@ public class TimeEntryRepository(MeridianDbContext db) : ITimeEntryRepository
 			.Include(t => t.Project)
 			.Include(t => t.Module)
 			.Include(t => t.Task)
+			.Include(t => t.UserStory)
 			.Where(t => t.EmployeeId == employeeId && t.WeekStartDate == weekStartDate)
 			.ToListAsync(ct);
 
 	public Task<TimeEntry?> GetByIdAsync(int timeEntryId, CancellationToken ct = default) =>
 		db.TimeEntries
 			.Include(t => t.Task)
+			.Include(t => t.UserStory)
 			.FirstOrDefaultAsync(t => t.TimeEntryId == timeEntryId, ct);
 
 	public async Task AddAsync(TimeEntry entry, CancellationToken ct = default) =>

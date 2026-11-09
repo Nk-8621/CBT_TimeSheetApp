@@ -15,8 +15,15 @@ public class TimesheetService(
 	IWeekRecordRepository weekRecordRepository,
 	IMasterDataRepository masterDataRepository,
 	IDayTypeResolutionService dayTypeResolutionService,
-	IDayTypeRequestRepository dayTypeRequestRepository) : ITimesheetService
+	IDayTypeRequestRepository dayTypeRequestRepository,
+	IUserStoryRepository userStoryRepository) : ITimesheetService
 {
+	/// <summary>Module and Task name used for every task added under a user
+	/// story. The employee only types a task name, but each timesheet line
+	/// still needs a Module and Task (reports and Excel use them), so each
+	/// project gets one "General › General" pair, created on first use.</summary>
+	private const string GeneralName = "General";
+
 	public async Task<WeekSummaryDto> GetWeekAsync(string employeeCode, DateOnly weekStartDate, CancellationToken ct = default)
 	{
 		var employee = await RequireEmployeeAsync(employeeCode, ct);
@@ -110,6 +117,33 @@ public class TimesheetService(
 	public async Task<TimeEntryDto> AddEntryAsync(string employeeCode, DateOnly weekStartDate, CreateTimeEntryRequest request, CancellationToken ct = default)
 	{
 		var employee = await RequireEmployeeAsync(employeeCode, ct);
+		return await AddEntryCoreAsync(employee, employeeCode, weekStartDate, request, userStory: null, ct);
+	}
+
+	public async Task<TimeEntryDto> AddStoryTaskAsync(string employeeCode, DateOnly weekStartDate, CreateStoryTaskRequest request, CancellationToken ct = default)
+	{
+		var employee = await RequireEmployeeAsync(employeeCode, ct);
+		await EnsureWeekEditableAsync(employee.EmployeeId, employeeCode, weekStartDate, ct);
+
+		var story = await RequireOwnActiveStoryAsync(request.UserStoryId, employee.EmployeeId, ct);
+		var taskName = request.TaskName?.Trim() ?? "";
+		if (taskName.Length == 0)
+			throw new BusinessRuleException("Enter the task name.");
+		TimeEntryRules.ValidateHours(request.HoursByDay);
+		if (request.HoursByDay.Sum() == 0)
+			throw new BusinessRuleException("Enter hours for at least one day.");
+
+		var (moduleId, taskId) = await GetGeneralModuleAndTaskAsync(story.ProjectId, ct);
+		var defaultClassification = story.Project?.DefaultBillable ?? "Billable";
+		var entryRequest = new CreateTimeEntryRequest(story.ProjectId, moduleId, taskId, defaultClassification, null, taskName, request.HoursByDay);
+		return await AddEntryCoreAsync(employee, employeeCode, weekStartDate, entryRequest, story, ct);
+	}
+
+	/// <summary>Shared by the classic Add Task Line and the user story task -
+	/// every rule (week editable, description, 8 h per line, day limits,
+	/// valid hierarchy, billing from allocation) lives here once.</summary>
+	private async Task<TimeEntryDto> AddEntryCoreAsync(Employee employee, string employeeCode, DateOnly weekStartDate, CreateTimeEntryRequest request, UserStory? userStory, CancellationToken ct)
+	{
 		await EnsureWeekEditableAsync(employee.EmployeeId, employeeCode, weekStartDate, ct);
 		if (string.IsNullOrWhiteSpace(request.Note))
 			throw new BusinessRuleException("A description is required for this task line.");
@@ -141,6 +175,8 @@ public class TimesheetService(
 			Classification = classification,
 			BillingCategory = billingCategory,
 			Note = request.Note,
+			UserStoryId = userStory?.UserStoryId,
+			UserStory = userStory,
 			CreatedAt = DateTime.UtcNow,
 		};
 		entry.HoursByDay = request.HoursByDay;
@@ -158,6 +194,24 @@ public class TimesheetService(
 		var employee = await employeeRepository.GetByIdAsync(entry.EmployeeId, ct)
 			?? throw new EntityNotFoundException(nameof(Employee), entry.EmployeeId);
 		await EnsureWeekEditableAsync(employee.EmployeeId, employee.EmployeeCode, entry.WeekStartDate, ct);
+
+		if (request.UserStoryId is int newStoryId && newStoryId != entry.UserStoryId)
+		{
+			// Moving a task to another of the employee's stories. If that story is
+			// on a different project, the line follows it to that project's
+			// General › General module and task.
+			var story = await RequireOwnActiveStoryAsync(newStoryId, employee.EmployeeId, ct);
+			if (story.ProjectId != entry.ProjectId)
+			{
+				var (generalModuleId, generalTaskId) = await GetGeneralModuleAndTaskAsync(story.ProjectId, ct);
+				await EnsureValidHierarchyAsync(story.ProjectId, generalModuleId, generalTaskId, requireActiveProject: true, ct);
+				entry.ProjectId = story.ProjectId;
+				entry.ModuleId = generalModuleId;
+				entry.TaskId = generalTaskId;
+			}
+			entry.UserStoryId = story.UserStoryId;
+			entry.UserStory = story;
+		}
 
 		if (request.ProjectId is not null || request.ModuleId is not null || request.TaskId is not null)
 		{
@@ -282,12 +336,13 @@ public class TimesheetService(
 		var previousWeek = weekStartDate.AddDays(-7);
 		var previousEntries = await timeEntryRepository.GetForWeekAsync(employee.EmployeeId, previousWeek, ct);
 		var currentEntries = await timeEntryRepository.GetForWeekAsync(employee.EmployeeId, weekStartDate, ct);
-		var existingKeys = currentEntries.Select(e => (e.ModuleId, e.TaskId)).ToHashSet();
+		var existingKeys = currentEntries.Select(CopyKey).ToHashSet();
 
 		var added = 0;
 		foreach (var prev in previousEntries)
 		{
-			if (existingKeys.Contains((prev.ModuleId, prev.TaskId))) continue;
+			if (!existingKeys.Add(CopyKey(prev))) continue;
+			if (prev.UserStory is { IsActive: false }) continue;
 
 			var copy = new TimeEntry
 			{
@@ -298,7 +353,10 @@ public class TimesheetService(
 				TaskId = prev.TaskId,
 				Classification = prev.Classification,
 				BillingCategory = prev.BillingCategory,
-				Note = null,
+				// A story task's Note is its name, so it comes along; a classic
+				// line's description is week-specific and starts blank as before.
+				Note = prev.UserStoryId is null ? null : prev.Note,
+				UserStoryId = prev.UserStoryId,
 				CreatedAt = DateTime.UtcNow,
 			};
 			copy.HoursByDay = [0, 0, 0, 0, 0, 0, 0];
@@ -337,6 +395,50 @@ public class TimesheetService(
 				? $"{label} is already full ({capacity:0.##} h). Edit an existing line instead of adding more hours."
 				: $"{label} has only {left:0.##} h left (a day can hold at most {capacity:0.##} h).");
 		}
+	}
+
+	/// <summary>Story tasks are matched by story + task name; classic lines by
+	/// module + task, as before.</summary>
+	private static string CopyKey(TimeEntry e) =>
+		e.UserStoryId is int storyId
+			? $"story:{storyId}:{(e.Note ?? "").Trim().ToLowerInvariant()}"
+			: $"line:{e.ModuleId}:{e.TaskId}";
+
+	private async Task<UserStory> RequireOwnActiveStoryAsync(int userStoryId, int employeeId, CancellationToken ct)
+	{
+		var story = await userStoryRepository.GetByIdAsync(userStoryId, ct)
+			?? throw new EntityNotFoundException(nameof(UserStory), userStoryId);
+		if (story.EmployeeId != employeeId)
+			throw new BusinessRuleException("This user story belongs to another employee.");
+		if (!story.IsActive)
+			throw new BusinessRuleException($"User story \"{story.Name}\" is closed - tasks can't be added to it.");
+		return story;
+	}
+
+	/// <summary>Finds the project's "General" module and its "General" task,
+	/// creating either one the first time it's needed. Reuses an existing
+	/// module/task of that name instead of adding a duplicate.</summary>
+	private async Task<(int ModuleId, int TaskId)> GetGeneralModuleAndTaskAsync(int projectId, CancellationToken ct)
+	{
+		var module = (await masterDataRepository.GetModulesAsync(projectId, ct))
+			.FirstOrDefault(m => string.Equals(m.Name, GeneralName, StringComparison.OrdinalIgnoreCase));
+		if (module is null)
+		{
+			module = new Module { ProjectId = projectId, Name = GeneralName, CreatedAt = DateTime.UtcNow };
+			await masterDataRepository.AddModuleAsync(module, ct);
+			await masterDataRepository.SaveChangesAsync(ct);
+		}
+
+		var task = (await masterDataRepository.GetTasksAsync(module.ModuleId, ct))
+			.FirstOrDefault(t => string.Equals(t.Name, GeneralName, StringComparison.OrdinalIgnoreCase));
+		if (task is null)
+		{
+			task = new WorkTask { ModuleId = module.ModuleId, Name = GeneralName, CreatedAt = DateTime.UtcNow };
+			await masterDataRepository.AddTaskAsync(task, ct);
+			await masterDataRepository.SaveChangesAsync(ct);
+		}
+
+		return (module.ModuleId, task.TaskId);
 	}
 
 	private async Task<Employee> RequireEmployeeAsync(string employeeCode, CancellationToken ct) =>
@@ -392,7 +494,9 @@ public class TimesheetService(
 		entry.Classification,
 		entry.BillingCategory,
 		entry.Note,
-		entry.HoursByDay
+		entry.HoursByDay,
+		entry.UserStoryId,
+		entry.UserStory?.Name
 	);
 
 	private static WeekRecordDto ToWeekRecordDto(string employeeCode, DateOnly weekStartDate, WeekRecord? week)
