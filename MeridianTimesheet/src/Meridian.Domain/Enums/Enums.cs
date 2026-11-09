@@ -20,8 +20,11 @@ public enum WeekStatus
 /// written there. It only ever comes out of DayTypeResolver, computed from an
 /// active Meridian half-day leave request (see DayTypeRequest), so it needs
 /// no corresponding change to that constraint.
+/// OD (on duty) is likewise never written there - it only comes out of
+/// DayTypeResolver, computed from an active On Duty request.
 /// W = working, WFH = work from home, L = leave (full day), LH = leave
-/// (half day - 4h leave, 4h still worked), H = holiday, O = weekly off.
+/// (half day - 4h leave, 4h still worked), H = holiday, O = weekly off,
+/// OD = on duty (a full 8h working day spent away on official duty).
 /// </summary>
 public enum DayType
 {
@@ -31,19 +34,22 @@ public enum DayType
     LH,
     H,
     O,
+    OD,
 }
 
 /// <summary>What an employee is asking to change a day to. Matches the CHECK
 /// constraint on Carbynetech_DayTypeRequest.RequestType. LeaveFirstHalf and
 /// LeaveSecondHalf both resolve to the same DayType.LH (4h leave, 4h still
 /// worked) - which half only matters for what the request itself records,
-/// not for capacity or grid resolution.</summary>
+/// not for capacity or grid resolution. OnDuty resolves to DayType.OD (a
+/// full 8h working day).</summary>
 public enum DayTypeRequestType
 {
     WFH,
     LeaveFirstHalf,
     LeaveSecondHalf,
     LeaveFull,
+    OnDuty,
 }
 
 /// <summary>Matches the CHECK constraint on Carbynetech_DayTypeRequest.Status.</summary>

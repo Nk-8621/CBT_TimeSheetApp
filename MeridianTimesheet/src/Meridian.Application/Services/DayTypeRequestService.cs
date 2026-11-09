@@ -22,7 +22,7 @@ public class DayTypeRequestService(
 		var employee = await RequireEmployeeAsync(employeeCode, ct);
 
 		if (!Enum.TryParse<DayTypeRequestType>(requestType, out var type))
-			throw new BusinessRuleException("Request type must be one of WFH, LeaveFirstHalf, LeaveSecondHalf or LeaveFull.");
+			throw new BusinessRuleException("Request type must be one of WFH, LeaveFirstHalf, LeaveSecondHalf, LeaveFull or OnDuty.");
 		if (string.IsNullOrWhiteSpace(note))
 			throw new BusinessRuleException("A note is required for this request.");
 		if (note.Length > 500) // Carbynetech_DayTypeRequest.Note is NVARCHAR(500)
@@ -73,8 +73,8 @@ public class DayTypeRequestService(
 
 		if (type is DayTypeRequestType.WFH)
 			await dayTypeRepository.SetAsync(employee.EmployeeId, date, DayType.WFH, ct);
-		// LeaveFirstHalf/LeaveSecondHalf/LeaveFull need no separate write - DayTypeResolutionService
-		// picks up any Pending-or-Approved leave request directly.
+		// LeaveFirstHalf/LeaveSecondHalf/LeaveFull/OnDuty need no separate write - DayTypeResolutionService
+		// picks up any Pending-or-Approved leave or on duty request directly.
 
 		await dayTypeRequestRepository.SaveChangesAsync(ct);
 		await dayTypeRepository.SaveChangesAsync(ct);
@@ -160,7 +160,7 @@ public class DayTypeRequestService(
 
 	private static decimal CapacityFor(DayTypeRequestType type) => type switch
 	{
-		DayTypeRequestType.WFH => WeekMath.StandardHoursPerDay,
+		DayTypeRequestType.WFH or DayTypeRequestType.OnDuty => WeekMath.StandardHoursPerDay,
 		DayTypeRequestType.LeaveFirstHalf or DayTypeRequestType.LeaveSecondHalf => WeekMath.StandardHoursPerDay / 2,
 		DayTypeRequestType.LeaveFull => 0m,
 		_ => 0m,
