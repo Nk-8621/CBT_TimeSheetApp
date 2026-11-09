@@ -29,7 +29,7 @@ public static class TimesheetValidator
 
         var capacity = dayTypes.Select(t => t switch
         {
-            DayType.W or DayType.WFH => WeekMath.StandardHoursPerDay,
+            DayType.W or DayType.WFH or DayType.OD => WeekMath.StandardHoursPerDay,
             DayType.LH => WeekMath.StandardHoursPerDay / 2,
             _ => 0m,
         }).ToArray();

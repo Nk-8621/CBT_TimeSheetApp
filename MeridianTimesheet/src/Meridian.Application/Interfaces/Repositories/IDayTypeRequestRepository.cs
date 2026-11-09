@@ -23,9 +23,9 @@ public interface IDayTypeRequestRepository
     /// layer filters this down to whoever's Level 1 manager the caller is.</summary>
     Task<IReadOnlyList<DayTypeRequest>> GetPendingAsync(CancellationToken ct = default);
 
-    /// <summary>Active (Pending or Approved) LeaveFirstHalf/LeaveSecondHalf/LeaveFull requests for this
+    /// <summary>Active (Pending or Approved) LeaveFirstHalf/LeaveSecondHalf/LeaveFull/OnDuty requests for this
     /// employee's week - the input DayTypeResolutionService needs to resolve leave
-    /// days that originated in Meridian rather than KEKA.</summary>
+    /// (and on duty) days that originated in Meridian rather than KEKA.</summary>
     Task<IReadOnlyList<DayTypeRequest>> GetActiveLeaveForWeekAsync(int employeeId, DateOnly weekStartDate, CancellationToken ct = default);
 
     Task AddAsync(DayTypeRequest request, CancellationToken ct = default);
