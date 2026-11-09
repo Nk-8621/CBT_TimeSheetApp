@@ -12,7 +12,9 @@ public record TimeEntryDto(
     string? Note,
     decimal[] HoursByDay, // Monday..Sunday
     int? UserStoryId = null,      // set when this line is a task under a user story
-    string? UserStoryName = null
+    string? UserStoryName = null,
+    DateOnly? UserStoryStartDate = null, // the story's dates - the grid locks days outside them
+    DateOnly? UserStoryEndDate = null
 );
 
 public record CreateTimeEntryRequest(

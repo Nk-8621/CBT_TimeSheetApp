@@ -25,4 +25,11 @@ public class UserStoriesController(IUserStoryService userStoryService, ICurrentU
 		var created = await userStoryService.CreateAsync(employeeCode, request, ct);
 		return CreatedAtAction(nameof(GetForEmployee), new { employeeCode }, created);
 	}
+
+	[HttpPut("{employeeCode}/{userStoryId:int}")]
+	public async Task<IActionResult> Update(string employeeCode, int userStoryId, [FromBody] UpdateUserStoryRequest request, CancellationToken ct)
+	{
+		if (EnsureSelfOrAdmin(employeeCode) is IActionResult denied) return denied;
+		return Ok(await userStoryService.UpdateAsync(employeeCode, userStoryId, request, ct));
+	}
 }

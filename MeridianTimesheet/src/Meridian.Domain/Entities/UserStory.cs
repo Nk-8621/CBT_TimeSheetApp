@@ -12,6 +12,13 @@ public class UserStory
 	public int EmployeeId { get; set; }
 	public int ProjectId { get; set; }
 	public required string Name { get; set; }
+
+	/// <summary>First and last day the story runs. Both required; EndDate is
+	/// never before StartDate. Tasks (hours) can only be added on days inside
+	/// this range, and the story shows only in weeks that overlap it (plus any
+	/// week where it already has tasks, as history).</summary>
+	public DateOnly StartDate { get; set; }
+	public DateOnly EndDate { get; set; }
 	public bool IsActive { get; set; } = true;
 	public DateTime CreatedAt { get; set; }
 	public DateTime? UpdatedAt { get; set; }

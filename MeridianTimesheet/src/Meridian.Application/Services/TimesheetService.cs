@@ -132,6 +132,7 @@ public class TimesheetService(
 		TimeEntryRules.ValidateHours(request.HoursByDay);
 		if (request.HoursByDay.Sum() == 0)
 			throw new BusinessRuleException("Enter hours for at least one day.");
+		EnsureWithinStoryDates(story, weekStartDate, new decimal[7], request.HoursByDay);
 
 		var (moduleId, taskId) = await GetGeneralModuleAndTaskAsync(story.ProjectId, ct);
 		var defaultClassification = story.Project?.DefaultBillable ?? "Billable";
@@ -195,8 +196,10 @@ public class TimesheetService(
 			?? throw new EntityNotFoundException(nameof(Employee), entry.EmployeeId);
 		await EnsureWeekEditableAsync(employee.EmployeeId, employee.EmployeeCode, entry.WeekStartDate, ct);
 
+		var storyChanged = false;
 		if (request.UserStoryId is int newStoryId && newStoryId != entry.UserStoryId)
 		{
+			storyChanged = true;
 			// Moving a task to another of the employee's stories. If that story is
 			// on a different project, the line follows it to that project's
 			// General › General module and task.
@@ -276,7 +279,15 @@ public class TimesheetService(
 		{
 			TimeEntryRules.ValidateHours(hours);
 			await EnsureDayLimitsAsync(employee.EmployeeId, entry.WeekStartDate, entry.TimeEntryId, entry.HoursByDay, hours, ct);
+			if (entry.UserStory is not null)
+				EnsureWithinStoryDates(entry.UserStory, entry.WeekStartDate, storyChanged ? new decimal[7] : entry.HoursByDay, hours);
 			entry.HoursByDay = hours;
+		}
+		else if (storyChanged && entry.UserStory is not null)
+		{
+			// Moved to another story without touching hours: its existing hours
+			// must still fall inside the new story's dates.
+			EnsureWithinStoryDates(entry.UserStory, entry.WeekStartDate, new decimal[7], entry.HoursByDay);
 		}
 		entry.UpdatedAt = DateTime.UtcNow;
 		BillingClassificationRules.Validate(entry.Classification, entry.BillingCategory);
@@ -343,6 +354,8 @@ public class TimesheetService(
 		{
 			if (!existingKeys.Add(CopyKey(prev))) continue;
 			if (prev.UserStory is { IsActive: false }) continue;
+			// A story that doesn't run in the new week isn't carried forward.
+			if (prev.UserStory is UserStory s && (s.EndDate < weekStartDate || s.StartDate > weekStartDate.AddDays(6))) continue;
 
 			var copy = new TimeEntry
 			{
@@ -403,6 +416,23 @@ public class TimesheetService(
 		e.UserStoryId is int storyId
 			? $"story:{storyId}:{(e.Note ?? "").Trim().ToLowerInvariant()}"
 			: $"line:{e.ModuleId}:{e.TaskId}";
+
+	/// <summary>A user story task can only get hours on days inside the story's
+	/// start-end dates. Only days where hours go UP are checked, so reducing or
+	/// clearing hours already logged outside the dates (e.g. after the story's
+	/// dates were changed) is always allowed.</summary>
+	private static void EnsureWithinStoryDates(UserStory story, DateOnly weekStartDate, decimal[] oldHours, decimal[] newHours)
+	{
+		for (var i = 0; i < 7; i++)
+		{
+			if (newHours[i] <= oldHours[i]) continue;
+
+			var date = weekStartDate.AddDays(i);
+			if (date < story.StartDate || date > story.EndDate)
+				throw new BusinessRuleException(
+					$"{date:ddd d MMM} is outside the dates of user story \"{story.Name}\" ({story.StartDate:d MMM} - {story.EndDate:d MMM yyyy}). Change the story's dates to log hours on that day.");
+		}
+	}
 
 	private async Task<UserStory> RequireOwnActiveStoryAsync(int userStoryId, int employeeId, CancellationToken ct)
 	{
@@ -496,7 +526,9 @@ public class TimesheetService(
 		entry.Note,
 		entry.HoursByDay,
 		entry.UserStoryId,
-		entry.UserStory?.Name
+		entry.UserStory?.Name,
+		entry.UserStory?.StartDate,
+		entry.UserStory?.EndDate
 	);
 
 	private static WeekRecordDto ToWeekRecordDto(string employeeCode, DateOnly weekStartDate, WeekRecord? week)

@@ -9,4 +9,8 @@ public interface IUserStoryService
 {
 	Task<IReadOnlyList<UserStoryDto>> GetForEmployeeAsync(string employeeCode, CancellationToken ct = default);
 	Task<UserStoryDto> CreateAsync(string employeeCode, CreateUserStoryRequest request, CancellationToken ct = default);
+
+	/// <summary>Changes a story's name and/or dates. Tasks already logged
+	/// outside the new dates are kept as they are (history).</summary>
+	Task<UserStoryDto> UpdateAsync(string employeeCode, int userStoryId, UpdateUserStoryRequest request, CancellationToken ct = default);
 }
