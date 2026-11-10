@@ -45,7 +45,7 @@ public class DayTypeRequestRepository(MeridianDbContext db) : IDayTypeRequestRep
             .Where(r =>
                 r.EmployeeId == employeeId &&
                 days.Contains(r.RequestDate) &&
-                (r.RequestType == DayTypeRequestType.LeaveFirstHalf || r.RequestType == DayTypeRequestType.LeaveSecondHalf || r.RequestType == DayTypeRequestType.LeaveFull || r.RequestType == DayTypeRequestType.OnDuty) &&
+                (r.RequestType == DayTypeRequestType.LeaveFirstHalf || r.RequestType == DayTypeRequestType.LeaveSecondHalf || r.RequestType == DayTypeRequestType.LeaveFull || r.RequestType == DayTypeRequestType.OnDuty || r.RequestType == DayTypeRequestType.CompOffFirstHalf || r.RequestType == DayTypeRequestType.CompOffSecondHalf || r.RequestType == DayTypeRequestType.CompOffFull) &&
                 (r.Status == DayTypeRequestStatus.Pending || r.Status == DayTypeRequestStatus.Approved))
             .ToListAsync(ct);
     }
