@@ -135,8 +135,11 @@ public class TimesheetService(
 		EnsureWithinStoryDates(story, weekStartDate, new decimal[7], request.HoursByDay);
 
 		var (moduleId, taskId) = await GetGeneralModuleAndTaskAsync(story.ProjectId, ct);
+		// Used only when the employee has no allocation on this project (e.g. his
+		// department's "Internal Work" project) - an allocation always wins.
 		var defaultClassification = story.Project?.DefaultBillable ?? "Billable";
-		var entryRequest = new CreateTimeEntryRequest(story.ProjectId, moduleId, taskId, defaultClassification, null, taskName, request.HoursByDay);
+		var defaultCategory = defaultClassification == "NonBillable" ? "OH" : null;
+		var entryRequest = new CreateTimeEntryRequest(story.ProjectId, moduleId, taskId, defaultClassification, defaultCategory, taskName, request.HoursByDay);
 		return await AddEntryCoreAsync(employee, employeeCode, weekStartDate, entryRequest, story, ct);
 	}
 

@@ -3,6 +3,7 @@ using Meridian.Application.Exceptions;
 using Meridian.Application.Interfaces.Repositories;
 using Meridian.Application.Interfaces.Services;
 using Meridian.Domain.Entities;
+using Meridian.Domain.Enums;
 
 namespace Meridian.Application.Services;
 
@@ -12,6 +13,11 @@ public class UserStoryService(
 	IMasterDataRepository masterDataRepository) : IUserStoryService
 {
 	private const int MaxNameLength = 200;
+
+	/// <summary>Code of a department's automatic "Internal Work" project,
+	/// followed by the department id (e.g. INT-GEN-12). Project codes are
+	/// limited to 20 characters, so the id is used instead of the name.</summary>
+	private const string InternalProjectCodePrefix = "INT-GEN-";
 
 	public async Task<IReadOnlyList<UserStoryDto>> GetForEmployeeAsync(string employeeCode, CancellationToken ct = default)
 	{
@@ -26,15 +32,9 @@ public class UserStoryService(
 		var name = ValidateName(request.Name);
 		ValidateDates(request.StartDate, request.EndDate);
 
-		var project = await masterDataRepository.GetProjectByIdAsync(request.ProjectId, ct)
-			?? throw new EntityNotFoundException(nameof(Project), request.ProjectId);
-		if (!project.IsActive)
-			throw new BusinessRuleException($"Project \"{project.Name}\" is inactive - pick another project.");
-
-		// Same rule as Add Task Line: you log time only on projects you're allocated to.
-		var allocations = await employeeRepository.GetProjectAllocationsAsync(employee.EmployeeId, ct);
-		if (allocations.All(a => a.ProjectId != project.ProjectId))
-			throw new BusinessRuleException($"You aren't allocated to \"{project.Name}\". Ask your admin to allocate you first.");
+		var project = request.ProjectId is int projectId
+			? await RequireAllocatedProjectAsync(employee, projectId, ct)
+			: await GetInternalWorkProjectAsync(employee, ct);
 
 		await EnsureNameNotTakenAsync(employee.EmployeeId, project.ProjectId, name, excludeStoryId: null, ct);
 
@@ -75,6 +75,74 @@ public class UserStoryService(
 		story.UpdatedAt = DateTime.UtcNow;
 		await userStoryRepository.SaveChangesAsync(ct);
 		return ToDto(story);
+	}
+
+	/// <summary>The project the employee picked: it must be active and one he
+	/// is allocated to (same rule as Add Task Line).</summary>
+	private async Task<Project> RequireAllocatedProjectAsync(Employee employee, int projectId, CancellationToken ct)
+	{
+		var project = await masterDataRepository.GetProjectByIdAsync(projectId, ct)
+			?? throw new EntityNotFoundException(nameof(Project), projectId);
+		if (!project.IsActive)
+			throw new BusinessRuleException($"Project \"{project.Name}\" is inactive - pick another project.");
+
+		var allocations = await employeeRepository.GetProjectAllocationsAsync(employee.EmployeeId, ct);
+		if (allocations.All(a => a.ProjectId != project.ProjectId))
+			throw new BusinessRuleException($"You aren't allocated to \"{project.Name}\". Ask your admin to allocate you first.");
+		return project;
+	}
+
+	/// <summary>No project picked. Allowed only for an employee with no active
+	/// allocated projects (e.g. HR, Sales): his story goes to his department's
+	/// "Internal Work" project - non-billable, under a "(Internal)" account of
+	/// that department, so reports still show the time under his department.
+	/// The account and project are created the first time they're needed.</summary>
+	private async Task<Project> GetInternalWorkProjectAsync(Employee employee, CancellationToken ct)
+	{
+		var allocations = await employeeRepository.GetProjectAllocationsAsync(employee.EmployeeId, ct);
+		var activeProjectIds = (await masterDataRepository.GetProjectsAsync(ct))
+			.Where(p => p.IsActive).Select(p => p.ProjectId).ToHashSet();
+		if (allocations.Any(a => activeProjectIds.Contains(a.ProjectId)))
+			throw new BusinessRuleException("Select the project this story belongs to.");
+
+		var department = await masterDataRepository.GetDepartmentByIdAsync(employee.DepartmentId, ct)
+			?? throw new EntityNotFoundException(nameof(Department), employee.DepartmentId);
+
+		// Reuse an existing project with this code (it is only ever made here).
+		var code = $"{InternalProjectCodePrefix}{department.DepartmentId}";
+		var existing = (await masterDataRepository.GetProjectsAsync(ct)).FirstOrDefault(p => p.Code == code);
+		if (existing is not null)
+			return await masterDataRepository.GetProjectByIdAsync(existing.ProjectId, ct) ?? existing;
+
+		var accountName = $"{department.Name} (Internal)";
+		var account = await masterDataRepository.GetAccountByNameAsync(accountName, ct);
+		if (account is null)
+		{
+			account = new Account
+			{
+				DepartmentId = department.DepartmentId,
+				Name = accountName,
+				AccountType = AccountType.Internal,
+				CreatedAt = DateTime.UtcNow,
+			};
+			await masterDataRepository.AddAccountAsync(account, ct);
+			await masterDataRepository.SaveChangesAsync(ct);
+		}
+
+		var project = new Project
+		{
+			AccountId = account.AccountId,
+			Code = code,
+			Name = $"{department.Name} – Internal Work",
+			DefaultBillable = "NonBillable",
+			BillingType = "Others",
+			IsActive = true,
+			NeedsReview = false,
+			CreatedAt = DateTime.UtcNow,
+		};
+		await masterDataRepository.AddProjectAsync(project, ct);
+		await masterDataRepository.SaveChangesAsync(ct);
+		return project;
 	}
 
 	private static string ValidateName(string? rawName)

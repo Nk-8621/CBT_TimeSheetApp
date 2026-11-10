@@ -11,7 +11,10 @@ public record UserStoryDto(
 	DateTime CreatedAt
 );
 
-public record CreateUserStoryRequest(string Name, int ProjectId, DateOnly StartDate, DateOnly EndDate);
+/// <summary>ProjectId is required for an employee who is allocated to
+/// projects. An employee with no allocated projects (e.g. HR, Sales) sends
+/// null - the story then goes to his department's "Internal Work" project.</summary>
+public record CreateUserStoryRequest(string Name, int? ProjectId, DateOnly StartDate, DateOnly EndDate);
 
 /// <summary>Edit a story's name and dates. The project can't change, because
 /// the story's tasks are already logged (and billed) against it.</summary>
