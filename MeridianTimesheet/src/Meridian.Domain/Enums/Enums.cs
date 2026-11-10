@@ -42,7 +42,9 @@ public enum DayType
 /// LeaveSecondHalf both resolve to the same DayType.LH (4h leave, 4h still
 /// worked) - which half only matters for what the request itself records,
 /// not for capacity or grid resolution. OnDuty resolves to DayType.OD (a
-/// full 8h working day).</summary>
+/// full 8h working day). CompOffFirstHalf / CompOffSecondHalf / CompOffFull
+/// (compensatory off) are shown exactly like leave - DayType.LH and DayType.L
+/// respectively - only the request itself records that it was a comp-off.</summary>
 public enum DayTypeRequestType
 {
     WFH,
@@ -50,6 +52,9 @@ public enum DayTypeRequestType
     LeaveSecondHalf,
     LeaveFull,
     OnDuty,
+    CompOffFirstHalf,
+    CompOffSecondHalf,
+    CompOffFull,
 }
 
 /// <summary>Matches the CHECK constraint on Carbynetech_DayTypeRequest.Status.</summary>

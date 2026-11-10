@@ -22,8 +22,9 @@ public static class DayTypeResolver
     {
         if (isHoliday) return DayType.H;
         if (isOnLeave) return DayType.L;
-        if (activeMeridianLeaveRequest is DayTypeRequestType.LeaveFull) return DayType.L;
-        if (activeMeridianLeaveRequest is DayTypeRequestType.LeaveFirstHalf or DayTypeRequestType.LeaveSecondHalf) return DayType.LH;
+        if (activeMeridianLeaveRequest is DayTypeRequestType.LeaveFull or DayTypeRequestType.CompOffFull) return DayType.L;
+        if (activeMeridianLeaveRequest is DayTypeRequestType.LeaveFirstHalf or DayTypeRequestType.LeaveSecondHalf
+            or DayTypeRequestType.CompOffFirstHalf or DayTypeRequestType.CompOffSecondHalf) return DayType.LH;
         if (activeMeridianLeaveRequest is DayTypeRequestType.OnDuty) return DayType.OD;
         if (explicitOverride is DayType.WFH) return DayType.WFH;
         if (WeekMath.IsWeekend(date)) return DayType.O;
