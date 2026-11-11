@@ -74,6 +74,15 @@ public class ApprovalsController(IWeekApprovalService approvalService, ICurrentU
 		return Ok(await approvalService.GetApprovalQueueAsync(CurrentUser.EmployeeCode, level2, ct));
 	}
 
+	/// <summary>Level 1 page, "Returned by Level 2" tab: weeks the caller
+	/// approved at Level 1 that Level 2 sent back to the employee. View only.</summary>
+	[HttpGet("returned")]
+	public async Task<IActionResult> GetReturnedByLevel2(CancellationToken ct)
+	{
+		if (CurrentUser.EmployeeCode is null) return Unauthorized();
+		return Ok(await approvalService.GetReturnedByLevel2Async(CurrentUser.EmployeeCode, ct));
+	}
+
 	/// <summary>Same scoping as Team Compliance: your own direct reports, or
 	/// everyone if you're Admin.</summary>
 	[HttpGet("{employeeCode}/{weekStart}/detail")]

@@ -279,6 +279,47 @@ public class WeekApprovalService(
 
 
 
+	public async Task<IReadOnlyList<ApprovalQueueItemDto>> GetReturnedByLevel2Async(string level1ApproverEmployeeCode, CancellationToken ct = default)
+	{
+		var rejectedWeeks = await weekRecordRepository.GetByStatusAsync(WeekStatus.Rejected, ct);
+
+		var result = new List<ApprovalQueueItemDto>();
+		foreach (var week in rejectedWeeks)
+		{
+			// Returned by Level 2 = Level 1 approved the latest submission. Level 1
+			// can only return a week before approving it, so a "Level 1 approved"
+			// event after the last submit means the return came from Level 2.
+			var lastSubmitted = week.ApprovalEvents
+				.Where(e => e.EventText.StartsWith("Submitted by"))
+				.Select(e => (DateTime?)e.EventTimestamp)
+				.Max();
+			var lastLevel1Approved = week.ApprovalEvents
+				.Where(e => e.EventText.StartsWith("Level 1 approved"))
+				.Select(e => (DateTime?)e.EventTimestamp)
+				.Max();
+			if (lastSubmitted is null || lastLevel1Approved is null || lastLevel1Approved < lastSubmitted) continue;
+
+			var employee = await employeeRepository.GetByIdAsync(week.EmployeeId, ct);
+			if (employee is null) continue;
+
+			// Only the employee's Level 1 manager sees it.
+			var routing = await DetermineApprovalRoutingAsync(employee.EmployeeCode, ct);
+			if (routing.SkipLevel1 || routing.Level1Approver?.EmployeeCode != level1ApproverEmployeeCode) continue;
+
+			var item = await GetWeekDetailAsync(employee.EmployeeCode, week.WeekStartDate, ct);
+			if (item is null) continue;
+
+			var returnedBy = week.RejectedByEmployeeId is int rejectedById
+				? await employeeRepository.GetByIdAsync(rejectedById, ct)
+				: null;
+
+			result.Add(item with { ReturnedByName = returnedBy?.FullName, ReturnReason = week.RejectionReason });
+		}
+
+		// Most recent week first.
+		return result.OrderByDescending(r => r.WeekStartDate).ThenBy(r => r.FullName).ToList();
+	}
+
 	private record ApprovalRouting(bool SkipLevel1, EmployeeDto? Level1Approver, EmployeeDto? Level2Approver);
 
 	/// <summary>Works out who approves at each level for this employee's

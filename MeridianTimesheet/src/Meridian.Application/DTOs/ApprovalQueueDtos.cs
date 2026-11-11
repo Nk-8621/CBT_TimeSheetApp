@@ -37,5 +37,8 @@ public record ApprovalQueueItemDto(
 	int LineCount,
 	IReadOnlyList<string> Flags,
 	IReadOnlyList<ApprovalQueueLineDto> Lines,
-	IReadOnlyList<DayTypeDto> DayTypes
+	IReadOnlyList<DayTypeDto> DayTypes,
+	// Filled only for the "Returned by Level 2" list: who returned the week and why.
+	string? ReturnedByName = null,
+	string? ReturnReason = null
 );

@@ -26,5 +26,10 @@ public interface IWeekApprovalService
     /// items first, matching the original wireframe.</summary>
     Task<IReadOnlyList<ApprovalQueueItemDto>> GetApprovalQueueAsync(string approverEmployeeCode, bool level2, CancellationToken ct = default);
 
+    /// <summary>Weeks this Level 1 manager approved that Level 2 then returned
+    /// to the employee. View only - once the employee resubmits, the week leaves
+    /// this list and is back in the normal Level 1 queue.</summary>
+    Task<IReadOnlyList<ApprovalQueueItemDto>> GetReturnedByLevel2Async(string level1ApproverEmployeeCode, CancellationToken ct = default);
+
 	Task<ApprovalQueueItemDto?> GetWeekDetailAsync(string employeeCode, DateOnly weekStartDate, CancellationToken ct = default);
 }
