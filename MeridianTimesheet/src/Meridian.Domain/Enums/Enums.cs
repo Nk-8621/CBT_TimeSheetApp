@@ -44,7 +44,10 @@ public enum DayType
 /// not for capacity or grid resolution. OnDuty resolves to DayType.OD (a
 /// full 8h working day). CompOffFirstHalf / CompOffSecondHalf / CompOffFull
 /// (compensatory off) are shown exactly like leave - DayType.LH and DayType.L
-/// respectively - only the request itself records that it was a comp-off.</summary>
+/// respectively - only the request itself records that it was a comp-off.
+/// The Leave* values are paid leave; UnpaidFirstHalf / UnpaidSecondHalf /
+/// UnpaidFull are unpaid leave, shown the same way (names kept short to fit
+/// the NVARCHAR(20) RequestType column).</summary>
 public enum DayTypeRequestType
 {
     WFH,
@@ -55,6 +58,9 @@ public enum DayTypeRequestType
     CompOffFirstHalf,
     CompOffSecondHalf,
     CompOffFull,
+    UnpaidFirstHalf,
+    UnpaidSecondHalf,
+    UnpaidFull,
 }
 
 /// <summary>Matches the CHECK constraint on Carbynetech_DayTypeRequest.Status.</summary>

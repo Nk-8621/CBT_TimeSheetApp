@@ -22,7 +22,7 @@ public class DayTypeRequestService(
 		var employee = await RequireEmployeeAsync(employeeCode, ct);
 
 		if (!Enum.TryParse<DayTypeRequestType>(requestType, out var type))
-			throw new BusinessRuleException("Request type must be one of WFH, LeaveFirstHalf, LeaveSecondHalf, LeaveFull, OnDuty, CompOffFirstHalf, CompOffSecondHalf or CompOffFull.");
+			throw new BusinessRuleException("Request type must be one of WFH, LeaveFirstHalf, LeaveSecondHalf, LeaveFull, OnDuty, CompOffFirstHalf, CompOffSecondHalf, CompOffFull, UnpaidFirstHalf, UnpaidSecondHalf or UnpaidFull.");
 		if (string.IsNullOrWhiteSpace(note))
 			throw new BusinessRuleException("A note is required for this request.");
 		if (note.Length > 500) // Carbynetech_DayTypeRequest.Note is NVARCHAR(500)
@@ -73,7 +73,7 @@ public class DayTypeRequestService(
 
 		if (type is DayTypeRequestType.WFH)
 			await dayTypeRepository.SetAsync(employee.EmployeeId, date, DayType.WFH, ct);
-		// LeaveFirstHalf/LeaveSecondHalf/LeaveFull/OnDuty/CompOffFirstHalf/CompOffSecondHalf/CompOffFull need no separate write -
+		// Leave*, OnDuty, CompOff* and Unpaid* requests need no separate write -
 		// DayTypeResolutionService picks up any Pending-or-Approved leave, on duty or comp-off request directly.
 
 		await dayTypeRequestRepository.SaveChangesAsync(ct);
@@ -162,8 +162,9 @@ public class DayTypeRequestService(
 	{
 		DayTypeRequestType.WFH or DayTypeRequestType.OnDuty => WeekMath.StandardHoursPerDay,
 		DayTypeRequestType.LeaveFirstHalf or DayTypeRequestType.LeaveSecondHalf
-			or DayTypeRequestType.CompOffFirstHalf or DayTypeRequestType.CompOffSecondHalf => WeekMath.StandardHoursPerDay / 2,
-		DayTypeRequestType.LeaveFull or DayTypeRequestType.CompOffFull => 0m,
+			or DayTypeRequestType.CompOffFirstHalf or DayTypeRequestType.CompOffSecondHalf
+			or DayTypeRequestType.UnpaidFirstHalf or DayTypeRequestType.UnpaidSecondHalf => WeekMath.StandardHoursPerDay / 2,
+		DayTypeRequestType.LeaveFull or DayTypeRequestType.CompOffFull or DayTypeRequestType.UnpaidFull => 0m,
 		_ => 0m,
 	};
 

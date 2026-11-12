@@ -5,7 +5,7 @@ public record DayTypeRequestDto(
     string EmployeeCode,
     string EmployeeName,
     DateOnly RequestDate,
-    string RequestType,   // WFH | LeaveFirstHalf | LeaveSecondHalf | LeaveFull | OnDuty | CompOffFirstHalf | CompOffSecondHalf | CompOffFull
+    string RequestType,   // WFH | LeaveFirstHalf | LeaveSecondHalf | LeaveFull | OnDuty | CompOffFirstHalf | CompOffSecondHalf | CompOffFull | UnpaidFirstHalf | UnpaidSecondHalf | UnpaidFull
     string Status,        // Pending | Approved | Rejected
     string? Note,
     DateTime SubmittedAt,
