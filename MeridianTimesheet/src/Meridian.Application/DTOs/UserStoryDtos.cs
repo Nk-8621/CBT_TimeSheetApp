@@ -8,7 +8,9 @@ public record UserStoryDto(
 	DateOnly StartDate,
 	DateOnly EndDate,
 	bool IsActive,
-	DateTime CreatedAt
+	DateTime CreatedAt,
+	// Tasks logged under the story in any week. A story can be deleted only when this is 0.
+	int TaskCount
 );
 
 /// <summary>ProjectId is required for an employee who is allocated to

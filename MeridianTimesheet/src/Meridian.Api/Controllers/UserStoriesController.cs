@@ -32,4 +32,13 @@ public class UserStoriesController(IUserStoryService userStoryService, ICurrentU
 		if (EnsureSelfOrAdmin(employeeCode) is IActionResult denied) return denied;
 		return Ok(await userStoryService.UpdateAsync(employeeCode, userStoryId, request, ct));
 	}
+
+	/// <summary>Deletes a story with no tasks in any week (400 if it has tasks).</summary>
+	[HttpDelete("{employeeCode}/{userStoryId:int}")]
+	public async Task<IActionResult> Delete(string employeeCode, int userStoryId, CancellationToken ct)
+	{
+		if (EnsureSelfOrAdmin(employeeCode) is IActionResult denied) return denied;
+		await userStoryService.DeleteAsync(employeeCode, userStoryId, ct);
+		return NoContent();
+	}
 }

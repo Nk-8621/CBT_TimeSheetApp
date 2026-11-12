@@ -23,7 +23,8 @@ public class UserStoryService(
 	{
 		var employee = await RequireEmployeeAsync(employeeCode, ct);
 		var stories = await userStoryRepository.GetForEmployeeAsync(employee.EmployeeId, ct);
-		return stories.Select(ToDto).ToList();
+		var taskCounts = await userStoryRepository.GetTaskCountsAsync(employee.EmployeeId, ct);
+		return stories.Select(s => ToDto(s, taskCounts.GetValueOrDefault(s.UserStoryId))).ToList();
 	}
 
 	public async Task<UserStoryDto> CreateAsync(string employeeCode, CreateUserStoryRequest request, CancellationToken ct = default)
@@ -50,7 +51,7 @@ public class UserStoryService(
 		};
 		await userStoryRepository.AddAsync(story, ct);
 		await userStoryRepository.SaveChangesAsync(ct);
-		return ToDto(story);
+		return ToDto(story, taskCount: 0);
 	}
 
 	public async Task<UserStoryDto> UpdateAsync(string employeeCode, int userStoryId, UpdateUserStoryRequest request, CancellationToken ct = default)
@@ -74,7 +75,26 @@ public class UserStoryService(
 		story.IsActive = true;
 		story.UpdatedAt = DateTime.UtcNow;
 		await userStoryRepository.SaveChangesAsync(ct);
-		return ToDto(story);
+
+		var taskCounts = await userStoryRepository.GetTaskCountsAsync(employee.EmployeeId, ct);
+		return ToDto(story, taskCounts.GetValueOrDefault(story.UserStoryId));
+	}
+
+	public async Task DeleteAsync(string employeeCode, int userStoryId, CancellationToken ct = default)
+	{
+		var employee = await RequireEmployeeAsync(employeeCode, ct);
+		var story = await userStoryRepository.GetByIdAsync(userStoryId, ct)
+			?? throw new EntityNotFoundException(nameof(UserStory), userStoryId);
+		if (story.EmployeeId != employee.EmployeeId)
+			throw new BusinessRuleException("This user story belongs to another employee.");
+
+		// Only an unused story can go - hours already logged under it stay safe.
+		var taskCounts = await userStoryRepository.GetTaskCountsAsync(employee.EmployeeId, ct);
+		if (taskCounts.GetValueOrDefault(story.UserStoryId) > 0)
+			throw new BusinessRuleException($"\"{story.Name}\" has tasks logged under it - remove its tasks first, then delete the story.");
+
+		userStoryRepository.Remove(story);
+		await userStoryRepository.SaveChangesAsync(ct);
 	}
 
 	/// <summary>The project the employee picked: it must be active and one he
@@ -179,6 +199,6 @@ public class UserStoryService(
 		await employeeRepository.GetByCodeAsync(employeeCode, ct)
 			?? throw new EntityNotFoundException(nameof(Employee), employeeCode);
 
-	private static UserStoryDto ToDto(UserStory s) =>
-		new(s.UserStoryId, s.Name, s.ProjectId, s.Project?.Name ?? "", s.StartDate, s.EndDate, s.IsActive, s.CreatedAt);
+	private static UserStoryDto ToDto(UserStory s, int taskCount) =>
+		new(s.UserStoryId, s.Name, s.ProjectId, s.Project?.Name ?? "", s.StartDate, s.EndDate, s.IsActive, s.CreatedAt, taskCount);
 }

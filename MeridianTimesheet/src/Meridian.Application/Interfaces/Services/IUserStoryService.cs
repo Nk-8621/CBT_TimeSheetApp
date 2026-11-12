@@ -13,4 +13,8 @@ public interface IUserStoryService
 	/// <summary>Changes a story's name and/or dates. Tasks already logged
 	/// outside the new dates are kept as they are (history).</summary>
 	Task<UserStoryDto> UpdateAsync(string employeeCode, int userStoryId, UpdateUserStoryRequest request, CancellationToken ct = default);
+
+	/// <summary>Deletes a story that has no tasks in any week. A story with
+	/// tasks can't be deleted - its tasks have to be removed first.</summary>
+	Task DeleteAsync(string employeeCode, int userStoryId, CancellationToken ct = default);
 }

@@ -22,5 +22,14 @@ public class UserStoryRepository(MeridianDbContext db) : IUserStoryRepository
 	public async Task AddAsync(UserStory userStory, CancellationToken ct = default) =>
 		await db.UserStories.AddAsync(userStory, ct);
 
+	public void Remove(UserStory userStory) => db.UserStories.Remove(userStory);
+
+	public Task<Dictionary<int, int>> GetTaskCountsAsync(int employeeId, CancellationToken ct = default) =>
+		db.TimeEntries
+			.Where(t => t.EmployeeId == employeeId && t.UserStoryId != null)
+			.GroupBy(t => t.UserStoryId!.Value)
+			.Select(g => new { UserStoryId = g.Key, Count = g.Count() })
+			.ToDictionaryAsync(x => x.UserStoryId, x => x.Count, ct);
+
 	public Task SaveChangesAsync(CancellationToken ct = default) => db.SaveChangesAsync(ct);
 }
