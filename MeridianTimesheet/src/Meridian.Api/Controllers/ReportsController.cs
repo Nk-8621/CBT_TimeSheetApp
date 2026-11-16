@@ -31,7 +31,10 @@ public class ReportsController(IReportsService reportsService, IEmployeeService 
 	[HttpGet("summary")]
 	public async Task<IActionResult> GetSummary(
 		[FromQuery] DateOnly weekFrom, [FromQuery] DateOnly weekTo,
-		[FromQuery] int? departmentId, [FromQuery] string approvalStatus, CancellationToken ct)
+		[FromQuery] int? departmentId, [FromQuery] string approvalStatus, CancellationToken ct,
+		// DATE RANGE (Nov 2026): optional exact From/To dates from the Reports page.
+		// weekFrom/weekTo are still sent (the Mondays of those dates). To revert: remove these two.
+		[FromQuery] DateOnly? from = null, [FromQuery] DateOnly? to = null)
 	{
 		if (currentUser.EmployeeCode is null) return Unauthorized();
 
@@ -40,6 +43,6 @@ public class ReportsController(IReportsService reportsService, IEmployeeService 
 			: await employeeService.GetDirectReportsAsync(currentUser.EmployeeCode, ct);
 
 		var employeeIds = scopeEmployees.Select(e => e.Id).ToList();
-		return Ok(await reportsService.GetSummaryAsync(employeeIds, weekFrom, weekTo, departmentId, approvalStatus, ct));
+		return Ok(await reportsService.GetSummaryAsync(employeeIds, weekFrom, weekTo, departmentId, approvalStatus, ct, from, to));
 	}
 }

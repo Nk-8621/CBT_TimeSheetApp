@@ -19,6 +19,21 @@ public class ReportsService(
 		["ok"] = [WeekStatus.Approved],
 	};
 
+	/// <summary>DATE RANGE (Nov 2026): sum of a week line's hours on the days
+	/// between fromDate and toDate (either may be null = open-ended).</summary>
+	private static decimal HoursWithinDates(decimal[] hoursByDay, DateOnly weekStart, DateOnly? fromDate, DateOnly? toDate)
+	{
+		decimal total = 0;
+		for (var i = 0; i < hoursByDay.Length; i++)
+		{
+			var day = weekStart.AddDays(i);
+			if (fromDate is DateOnly from && day < from) continue;
+			if (toDate is DateOnly to && day > to) continue;
+			total += hoursByDay[i];
+		}
+		return total;
+	}
+
 	private record Contribution(int DeptId, int AccountId, int ProjectId, int ModuleId, int TaskId, int EmployeeId, string Classification, decimal Hours);
 
 	public async Task<IReadOnlyList<ProjectHoursReportRowDto>> GetProjectHoursAsync(
@@ -73,7 +88,8 @@ public class ReportsService(
 	}
 
 	public async Task<ReportsSummaryDto> GetSummaryAsync(
-		IReadOnlyList<int> employeeIds, DateOnly weekFrom, DateOnly weekTo, int? departmentId, string approvalStatus, CancellationToken ct = default)
+		IReadOnlyList<int> employeeIds, DateOnly weekFrom, DateOnly weekTo, int? departmentId, string approvalStatus, CancellationToken ct = default,
+		DateOnly? fromDate = null, DateOnly? toDate = null)
 	{
 		var statusSet = StatusSets.TryGetValue(approvalStatus, out var s) ? s : StatusSets["all"];
 
@@ -107,7 +123,12 @@ public class ReportsService(
 				var entries = entriesByEmployeeWeek[(employeeId, week)];
 				foreach (var entry in entries)
 				{
-					var hours = entry.TotalHours;
+					// DATE RANGE (Nov 2026): with exact dates, count only the days of this
+					// week that fall between them (e.g. from a Wednesday = Wed..Sun).
+					// To revert: go back to just "var hours = entry.TotalHours;".
+					var hours = fromDate is null && toDate is null
+						? entry.TotalHours
+						: HoursWithinDates(entry.HoursByDay, week, fromDate, toDate);
 					if (hours == 0) continue;
 					if (!projectById.TryGetValue(entry.ProjectId, out var project)) continue;
 					if (!accountById.TryGetValue(project.AccountId, out var account)) continue;
