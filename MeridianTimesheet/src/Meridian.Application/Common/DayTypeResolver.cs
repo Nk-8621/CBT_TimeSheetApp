@@ -18,7 +18,10 @@ public static class DayTypeResolver
         bool isHoliday,
         bool isOnLeave,
         DayTypeRequestType? activeMeridianLeaveRequest,
-        DayType? explicitOverride)
+        DayType? explicitOverride,
+        // WEEK OFFS (Nov 2026): the employee's own week-off day (company
+        // default Sat/Sun, or their client's days from Master Data -> Week Offs).
+        bool isWeekOff)
     {
         if (isHoliday) return DayType.H;
         if (isOnLeave) return DayType.L;
@@ -30,7 +33,7 @@ public static class DayTypeResolver
         // DAY STATUS (Nov 2026): Leave picked by the employee on My Timesheet.
         if (explicitOverride is DayType.L) return DayType.L;
         if (explicitOverride is DayType.WFH) return DayType.WFH;
-        if (WeekMath.IsWeekend(date)) return DayType.O;
+        if (isWeekOff) return DayType.O;
         return DayType.W;
     }
 }

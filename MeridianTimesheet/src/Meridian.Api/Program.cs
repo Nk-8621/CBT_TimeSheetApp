@@ -28,6 +28,7 @@ builder.Services.AddScoped<IReportsService, ReportsService>();
 builder.Services.AddScoped<IAccessControlService, AccessControlService>();
 builder.Services.AddScoped<IDayTypeResolutionService, DayTypeResolutionService>();
 builder.Services.AddScoped<IDayTypeRequestService, DayTypeRequestService>();
+builder.Services.AddScoped<IWeekOffService, WeekOffService>(); // WEEK OFFS (Nov 2026)
 
 builder.Services.AddScoped<ITimesheetExcelImportService, TimesheetExcelImportService>();
 

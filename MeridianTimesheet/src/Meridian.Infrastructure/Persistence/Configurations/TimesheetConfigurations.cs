@@ -119,3 +119,19 @@ public class ApprovalEventConfiguration : IEntityTypeConfiguration<ApprovalEvent
         builder.HasOne(a => a.ActedBy).WithMany().HasForeignKey(a => a.ActedByEmployeeId).OnDelete(DeleteBehavior.Restrict);
     }
 }
+
+// WEEK OFFS (Nov 2026): created by script 35_add_employee_week_offs.sql.
+public class EmployeeWeekOffConfiguration : IEntityTypeConfiguration<EmployeeWeekOff>
+{
+    public void Configure(EntityTypeBuilder<EmployeeWeekOff> builder)
+    {
+        builder.ToTable("Carbynetech_EmployeeWeekOff");
+        builder.HasKey(w => w.EmployeeWeekOffId);
+        builder.Property(w => w.WeekOffDays).HasMaxLength(30).IsRequired();
+        builder.HasIndex(w => w.EmployeeId);
+
+        builder.HasOne(w => w.Employee).WithMany().HasForeignKey(w => w.EmployeeId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(w => w.Account).WithMany().HasForeignKey(w => w.AccountId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(w => w.CreatedBy).WithMany().HasForeignKey(w => w.CreatedByEmployeeId).OnDelete(DeleteBehavior.Restrict);
+    }
+}

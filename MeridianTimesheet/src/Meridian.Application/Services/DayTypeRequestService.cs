@@ -15,7 +15,8 @@ public class DayTypeRequestService(
 	IDayTypeRequestRepository dayTypeRequestRepository,
 	IWeekRecordRepository weekRecordRepository,
 	IMasterDataRepository masterDataRepository,
-	IEmployeeService employeeService) : IDayTypeRequestService
+	IEmployeeService employeeService,
+	IDayTypeResolutionService dayTypeResolutionService) : IDayTypeRequestService
 {
 	public async Task<DayTypeRequestDto> SubmitAsync(string employeeCode, DateOnly date, string requestType, string? note, CancellationToken ct = default)
 	{
@@ -39,7 +40,10 @@ public class DayTypeRequestService(
 		var holiday = await masterDataRepository.GetHolidayOnAsync(date, employee.PrimaryAccountId, ct);
 		if (holiday is not null)
 			throw new BusinessRuleException($"{date:d MMM} is already a holiday ({holiday.Name}) - nothing to request.");
-		if (WeekMath.IsWeekend(date))
+		// WEEK OFFS (Nov 2026): the employee's own week-off days, not just Sat/Sun.
+		var requestWeekStart = WeekMath.MondayOf(date);
+		var requestDay = (await dayTypeResolutionService.ResolveWeekAsync(employee.EmployeeId, requestWeekStart, ct))[date.DayNumber - requestWeekStart.DayNumber];
+		if (requestDay.DayType == nameof(DayType.O))
 			throw new BusinessRuleException($"{date:d MMM} is a W-OFF day - nothing to request.");
 
 		var existing = await dayTypeRequestRepository.GetActiveForDateAsync(employee.EmployeeId, date, ct);

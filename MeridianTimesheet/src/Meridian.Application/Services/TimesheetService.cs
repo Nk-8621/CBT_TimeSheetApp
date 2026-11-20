@@ -330,18 +330,19 @@ public class TimesheetService(
 		if (!Enum.TryParse<DayType>(dayType, out var parsed) || parsed is not (DayType.W or DayType.WFH or DayType.L))
 			throw new BusinessRuleException("A day can only be set to Working, Leave or WFH.");
 
-		if (WeekMath.IsWeekend(date))
+		// WEEK OFFS (Nov 2026): W-OFF and holidays come from the employee's own
+		// week offs (company default or their client's), so ask the resolver.
+		var dayIndex = date.DayNumber - weekStart.DayNumber;
+		var resolvedDay = (await dayTypeResolutionService.ResolveWeekAsync(employee.EmployeeId, weekStart, ct))[dayIndex];
+		if (resolvedDay.DayType == nameof(DayType.O))
 			throw new BusinessRuleException($"{date:d MMM} is a W-OFF day and can't be changed.");
-
-		var holiday = await masterDataRepository.GetHolidayOnAsync(date, employee.PrimaryAccountId, ct);
-		if (holiday is not null)
-			throw new BusinessRuleException($"{date:d MMM} is a holiday ({holiday.Name}) and can't be changed here.");
+		if (resolvedDay.DayType == nameof(DayType.H))
+			throw new BusinessRuleException($"{date:d MMM} is a holiday and can't be changed here.");
 
 		// A leave day holds no hours - the employee clears that day's hours first.
 		if (parsed is DayType.L)
 		{
 			var entries = await timeEntryRepository.GetForWeekAsync(employee.EmployeeId, weekStart, ct);
-			var dayIndex = date.DayNumber - weekStart.DayNumber;
 			var loggedHours = entries.Sum(e => e.HoursByDay[dayIndex]);
 			if (loggedHours > 0)
 				throw new BusinessRuleException(
@@ -415,7 +416,9 @@ public class TimesheetService(
 			var otherLinesTotal = entries
 				.Where(e => e.TimeEntryId != excludeEntryId)
 				.Sum(e => e.HoursByDay[i]);
-			var capacity = dayTypes[i].CapacityHours;
+			// WEEK OFFS (Nov 2026): a W-OFF day has no required hours, but up to
+			// a normal day's hours can be logged there as extra work.
+			var capacity = dayTypes[i].DayType == nameof(DayType.O) ? WeekMath.StandardHoursPerDay : dayTypes[i].CapacityHours;
 			if (otherLinesTotal + newHours[i] <= capacity) continue;
 
 			var left = Math.Max(0m, capacity - otherLinesTotal);
@@ -567,4 +570,4 @@ public class TimesheetService(
 			trail
 		);
 	}
-}
+}
