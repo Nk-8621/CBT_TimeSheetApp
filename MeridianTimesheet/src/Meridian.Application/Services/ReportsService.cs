@@ -142,7 +142,16 @@ public class ReportsService(
 			}
 		}
 
-		List<ReportRollupRowDto> BuildRollup(IEnumerable<IGrouping<int, Contribution>> groups, Func<int, (string Label, string Sub)> labelOf)
+		// How an employee is labelled - used by the Resource-wise list and by
+		// the employee rows shown when a Department / Customer / Project row is expanded.
+		(string Label, string Sub) ResourceLabel(int id)
+		{
+			if (!employeeById.TryGetValue(id, out var e)) return ("—", "—");
+			var deptName = deptById.TryGetValue(e.DepartmentId, out var d) ? d.Name : "—";
+			return (e.FullName, $"{e.Designation} · {deptName}");
+		}
+
+		List<ReportRollupRowDto> BuildRollup(IEnumerable<IGrouping<int, Contribution>> groups, Func<int, (string Label, string Sub)> labelOf, bool includeResources = false)
 		{
 			return groups
 				.Select(g =>
@@ -153,35 +162,33 @@ public class ReportsService(
 					var nonBillable = g.Where(x => x.Classification == "NonBillable").Sum(x => x.Hours);
 					var total = g.Sum(x => x.Hours);
 					var resources = g.Select(x => x.EmployeeId).Distinct().Count();
-					return new ReportRollupRowDto(label, sub, total, billable, partialBillable, nonBillable, resources);
+					var resourceRows = includeResources
+						? BuildRollup(g.GroupBy(x => x.EmployeeId), ResourceLabel)
+						: null;
+					return new ReportRollupRowDto(label, sub, total, billable, partialBillable, nonBillable, resources, resourceRows);
 				})
 				.OrderByDescending(r => r.TotalHours)
 				.ToList();
 		}
 
 		var deptWise = BuildRollup(contributions.GroupBy(c => c.DeptId), id =>
-			deptById.TryGetValue(id, out var d) ? (d.Name, d.Code) : ("—", "—"));
+			deptById.TryGetValue(id, out var d) ? (d.Name, d.Code) : ("—", "—"), includeResources: true);
 
 		var accWise = BuildRollup(contributions.GroupBy(c => c.AccountId), id =>
 		{
 			if (!accountById.TryGetValue(id, out var a)) return ("—", "—");
 			var deptName = deptById.TryGetValue(a.DepartmentId, out var d) ? d.Name : "—";
 			return (a.Name, $"{a.AccountType} · {deptName}");
-		});
+		}, includeResources: true);
 
 		var projWise = BuildRollup(contributions.GroupBy(c => c.ProjectId), id =>
 		{
 			if (!projectById.TryGetValue(id, out var p)) return ("—", "—");
 			var accName = accountById.TryGetValue(p.AccountId, out var a) ? a.Name : "—";
 			return (p.Name, $"{p.Code} · {accName}");
-		});
+		}, includeResources: true);
 
-		var resWise = BuildRollup(contributions.GroupBy(c => c.EmployeeId), id =>
-		{
-			if (!employeeById.TryGetValue(id, out var e)) return ("—", "—");
-			var deptName = deptById.TryGetValue(e.DepartmentId, out var d) ? d.Name : "—";
-			return (e.FullName, $"{e.Designation} · {deptName}");
-		});
+		var resWise = BuildRollup(contributions.GroupBy(c => c.EmployeeId), ResourceLabel);
 
 		var taskWise = BuildRollup(contributions.GroupBy(c => c.TaskId), id =>
 		{
@@ -204,4 +211,4 @@ public class ReportsService(
 			deptWise, accWise, projWise, resWise, taskWise
 		);
 	}
-}
+}

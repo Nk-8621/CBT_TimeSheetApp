@@ -39,7 +39,11 @@ public record ReportRollupRowDto(
 	decimal BillableHours,
 	decimal PartialBillableHours,
 	decimal NonBillableHours,
-	int ResourceCount
+	int ResourceCount,
+	// RESOURCE EXPANSION (Nov 2026): the employees behind this row, each with
+	// their own hours split. Filled for the Department / Customer / Project
+	// tabs only; null elsewhere.
+	IReadOnlyList<ReportRollupRowDto>? Resources = null
 );
 
 /// <summary>The full Reports screen payload — top KPIs plus all five rollup
@@ -58,4 +62,4 @@ public record ReportsSummaryDto(
 	IReadOnlyList<ReportRollupRowDto> ProjectWise,
 	IReadOnlyList<ReportRollupRowDto> ResourceWise,
 	IReadOnlyList<ReportRollupRowDto> TaskWise
-);
+);
