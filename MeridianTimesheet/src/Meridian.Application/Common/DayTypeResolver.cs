@@ -27,6 +27,8 @@ public static class DayTypeResolver
             or DayTypeRequestType.CompOffFirstHalf or DayTypeRequestType.CompOffSecondHalf
             or DayTypeRequestType.UnpaidFirstHalf or DayTypeRequestType.UnpaidSecondHalf) return DayType.LH;
         if (activeMeridianLeaveRequest is DayTypeRequestType.OnDuty) return DayType.OD;
+        // DAY STATUS (Nov 2026): Leave picked by the employee on My Timesheet.
+        if (explicitOverride is DayType.L) return DayType.L;
         if (explicitOverride is DayType.WFH) return DayType.WFH;
         if (WeekMath.IsWeekend(date)) return DayType.O;
         return DayType.W;

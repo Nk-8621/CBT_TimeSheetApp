@@ -56,8 +56,11 @@ public class DayTypeResolutionService(
 			var requestTypeForLeaveHalf = resolved == DayType.LH && leaveRequestByDate.ContainsKey(date)
 				? leaveRequestType.ToString()
 				: null;
-			result.Add(new DayTypeDto(date, resolved.ToString(), capacity, requestTypeForLeaveHalf));
+			// DAY STATUS (Nov 2026): only plain days (not W-OFF, holiday, KEKA
+			// leave or a leave/On Duty request) can be changed by the employee.
+			var canChange = !isHoliday && !isOnLeave && !leaveRequestByDate.ContainsKey(date) && !WeekMath.IsWeekend(date);
+			result.Add(new DayTypeDto(date, resolved.ToString(), capacity, requestTypeForLeaveHalf, canChange));
 		}
 		return result;
 	}
-}
+}

@@ -326,20 +326,33 @@ public class TimesheetService(
 		var weekStart = WeekMath.MondayOf(date);
 		await EnsureWeekEditableAsync(employee.EmployeeId, employeeCode, weekStart, ct);
 
-		if (!Enum.TryParse<DayType>(dayType, out var parsed) || parsed is not (DayType.W or DayType.WFH))
-			throw new BusinessRuleException(
-				"Only 'W' (working) or 'WFH' can be set directly. Holiday and Leave are synced from the holiday " +
-				"calendar and KEKA respectively and can't be edited here.");
+		// DAY STATUS (Nov 2026): the employee picks Working, Leave or WFH for a day.
+		if (!Enum.TryParse<DayType>(dayType, out var parsed) || parsed is not (DayType.W or DayType.WFH or DayType.L))
+			throw new BusinessRuleException("A day can only be set to Working, Leave or WFH.");
+
+		if (WeekMath.IsWeekend(date))
+			throw new BusinessRuleException($"{date:d MMM} is a W-OFF day and can't be changed.");
 
 		var holiday = await masterDataRepository.GetHolidayOnAsync(date, employee.PrimaryAccountId, ct);
 		if (holiday is not null)
 			throw new BusinessRuleException($"{date:d MMM} is a holiday ({holiday.Name}) and can't be changed here.");
 
+		// A leave day holds no hours - the employee clears that day's hours first.
+		if (parsed is DayType.L)
+		{
+			var entries = await timeEntryRepository.GetForWeekAsync(employee.EmployeeId, weekStart, ct);
+			var dayIndex = date.DayNumber - weekStart.DayNumber;
+			var loggedHours = entries.Sum(e => e.HoursByDay[dayIndex]);
+			if (loggedHours > 0)
+				throw new BusinessRuleException(
+					$"{date:ddd d MMM} already has {loggedHours:0.##} h logged. Clear those hours first, then mark the day as Leave.");
+		}
+
 		await dayTypeRepository.SetAsync(employee.EmployeeId, date, parsed, ct);
 		await dayTypeRepository.SaveChangesAsync(ct);
 
 		var capacity = parsed is DayType.W or DayType.WFH ? WeekMath.StandardHoursPerDay : 0m;
-		return new DayTypeDto(date, parsed.ToString(), capacity);
+		return new DayTypeDto(date, parsed.ToString(), capacity, CanChange: true);
 	}
 
 	public async Task<int> CopyLastWeekAsync(string employeeCode, DateOnly weekStartDate, CancellationToken ct = default)
@@ -554,4 +567,4 @@ public class TimesheetService(
 			trail
 		);
 	}
-}
+}

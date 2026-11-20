@@ -43,6 +43,10 @@ public record DayTypeDto(DateOnly Date, string DayType, decimal CapacityHours,
 	// ("LeaveFirstHalf" / "LeaveSecondHalf") drove the resolution, so callers
 	// like Team Compliance can render the correct half of the day box. Null
 	// for every other day type.
-	string? RequestType = null);
+	string? RequestType = null,
+	// DAY STATUS (Nov 2026): true when the employee can switch this day
+	// between Working / Leave / WFH on My Timesheet. False on W-OFF,
+	// holidays, KEKA leave and days with a leave/On Duty request.
+	bool CanChange = false);
 
 public record SetDayTypeRequest(string DayType);
