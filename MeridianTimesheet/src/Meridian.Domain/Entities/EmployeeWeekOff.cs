@@ -1,11 +1,11 @@
 namespace Meridian.Domain.Entities;
 
 /// <summary>
-/// WEEK OFFS (Nov 2026): an employee working for a client whose week offs
-/// differ from the company default (Sat + Sun). Added by HR / Admin from
-/// Master Data -> Week Offs. Between EffectiveFrom and EffectiveTo (open
-/// ended when null) the employee follows these week-off days and the
-/// client's holidays. Employees without a record follow the company default.
+/// WEEK OFFS (Nov 2026): an employee assigned to a client's week offs
+/// (Master Data -> Week Offs -> Add Employees). Between EffectiveFrom and
+/// EffectiveTo (open ended when null) the employee follows that client's
+/// week-off days (ClientWeekOff) and only that client's holidays. Employees
+/// without an assignment follow the company default (Sat + Sun).
 /// </summary>
 public class EmployeeWeekOff
 {
@@ -14,9 +14,6 @@ public class EmployeeWeekOff
 
 	/// <summary>The client the employee works for during this period.</summary>
 	public int AccountId { get; set; }
-
-	/// <summary>Comma-separated short day names, e.g. "Fri,Sat".</summary>
-	public required string WeekOffDays { get; set; }
 
 	public DateOnly EffectiveFrom { get; set; }
 	public DateOnly? EffectiveTo { get; set; }

@@ -30,18 +30,25 @@ public class DayTypeResolutionService(
 		// One query for the whole week instead of one per day.
 		var weekHolidays = await masterDataRepository.GetHolidaysAsync(days[0], days[^1], ct);
 
-		// WEEK OFFS (Nov 2026): the employee's client week-off records for this week (usually none).
+		// WEEK OFFS (Nov 2026): the employee's client assignments for this week
+		// (usually none), and those clients' week-off periods.
 		var weekOffRecords = await weekOffRepository.GetForEmployeeAsync(employeeId, days[0], days[^1], ct);
+		var clientWeekOffs = weekOffRecords.Count == 0
+			? []
+			: await weekOffRepository.GetClientWeekOffsForAccountsAsync(weekOffRecords.Select(w => w.AccountId).Distinct().ToList(), ct);
 
 		var result = new List<DayTypeDto>(7);
 		foreach (var date in days)
 		{
-			// WEEK OFFS (Nov 2026): with a client record for this day, the employee
-			// follows that client's week-off days and only that client's holidays.
-			// Without one: company default Sat + Sun, and company-wide holidays
+			// WEEK OFFS (Nov 2026): assigned to a client on this day -> that client's
+			// week-off days (for this date) and only that client's holidays.
+			// Not assigned -> company default Sat + Sun, and company-wide holidays
 			// plus their primary client's (same rule as before).
 			var weekOff = weekOffRecords.FirstOrDefault(w => w.EffectiveFrom <= date && (w.EffectiveTo == null || w.EffectiveTo >= date));
-			var weekOffDays = weekOff is null ? WeekOffDays.CompanyDefault.ToList() : WeekOffDays.Parse(weekOff.WeekOffDays);
+			var clientDays = weekOff is null
+				? null
+				: clientWeekOffs.FirstOrDefault(c => c.AccountId == weekOff.AccountId && c.EffectiveFrom <= date && (c.EffectiveTo == null || c.EffectiveTo >= date));
+			var weekOffDays = clientDays is null ? WeekOffDays.CompanyDefault.ToList() : WeekOffDays.Parse(clientDays.WeekOffDays);
 			var isWeekOff = weekOffDays.Contains(date.DayOfWeek);
 			var isHoliday = weekOff is null
 				? weekHolidays.Any(h => h.HolidayDate == date && (h.AccountId == null || h.AccountId == primaryAccountId))

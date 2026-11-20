@@ -36,6 +36,7 @@ public class MeridianDbContext(DbContextOptions<MeridianDbContext> options) : Db
     public DbSet<UserStory> UserStories => Set<UserStory>();
     public DbSet<DayTypeOverride> DayTypeOverrides => Set<DayTypeOverride>();
     public DbSet<DayTypeRequest> DayTypeRequests => Set<DayTypeRequest>();
+    public DbSet<ClientWeekOff> ClientWeekOffs => Set<ClientWeekOff>();
     public DbSet<EmployeeWeekOff> EmployeeWeekOffs => Set<EmployeeWeekOff>();
     public DbSet<WeekRecord> WeekRecords => Set<WeekRecord>();
     public DbSet<ApprovalEvent> ApprovalEvents => Set<ApprovalEvent>();
@@ -67,6 +68,7 @@ public class MeridianDbContext(DbContextOptions<MeridianDbContext> options) : Db
         modelBuilder.ApplyConfiguration(new UserStoryConfiguration());
         modelBuilder.ApplyConfiguration(new DayTypeOverrideConfiguration());
         modelBuilder.ApplyConfiguration(new DayTypeRequestConfiguration());
+        modelBuilder.ApplyConfiguration(new ClientWeekOffConfiguration());
         modelBuilder.ApplyConfiguration(new EmployeeWeekOffConfiguration());
         modelBuilder.ApplyConfiguration(new WeekRecordConfiguration());
         modelBuilder.ApplyConfiguration(new ApprovalEventConfiguration());
