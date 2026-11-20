@@ -53,7 +53,7 @@ public static class TimesheetValidator
             var label = date.ToString("d MMM");
 
             if (dayTotals[i] > 0 && capacity[i] == 0)
-                errors.Add($"{label} is marked {dayTypes[i]} but has {dayTotals[i]:0.##} h logged.");
+                errors.Add($"{label} is {DayLabel(dayTypes[i])} but has {dayTotals[i]:0.##} h logged.");
 
             // Same rule the My Timesheet screen applies before enabling Submit:
             // every working day must total exactly its capacity (8 h, or 4 h on
@@ -71,4 +71,13 @@ public static class TimesheetValidator
 
         return (errors, warnings);
     }
+
+    // Same wording the screens use for a closed day.
+    private static string DayLabel(DayType dayType) => dayType switch
+    {
+        DayType.O => "a W-OFF day",
+        DayType.H => "a holiday",
+        DayType.L => "a leave day",
+        _ => $"marked {dayType}",
+    };
 }

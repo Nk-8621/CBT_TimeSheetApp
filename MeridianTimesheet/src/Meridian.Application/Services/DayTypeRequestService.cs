@@ -40,7 +40,7 @@ public class DayTypeRequestService(
 		if (holiday is not null)
 			throw new BusinessRuleException($"{date:d MMM} is already a holiday ({holiday.Name}) - nothing to request.");
 		if (WeekMath.IsWeekend(date))
-			throw new BusinessRuleException($"{date:d MMM} is a weekly off day - nothing to request.");
+			throw new BusinessRuleException($"{date:d MMM} is a W-OFF day - nothing to request.");
 
 		var existing = await dayTypeRequestRepository.GetActiveForDateAsync(employee.EmployeeId, date, ct);
 		if (existing is not null)
