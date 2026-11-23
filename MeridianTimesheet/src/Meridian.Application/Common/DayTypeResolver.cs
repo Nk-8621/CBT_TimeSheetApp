@@ -32,6 +32,7 @@ public static class DayTypeResolver
         if (activeMeridianLeaveRequest is DayTypeRequestType.OnDuty) return DayType.OD;
         // DAY STATUS (Nov 2026): Leave picked by the employee on My Timesheet.
         if (explicitOverride is DayType.L) return DayType.L;
+        if (explicitOverride is DayType.LH) return DayType.LH; // Half Day Leave picked by the employee
         if (explicitOverride is DayType.WFH) return DayType.WFH;
         if (isWeekOff) return DayType.O;
         return DayType.W;

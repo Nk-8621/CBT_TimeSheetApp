@@ -52,8 +52,7 @@ public static class TimesheetValidator
             var date = days[i];
             var label = date.ToString("d MMM");
 
-            // WEEK OFFS (Nov 2026): hours on a W-OFF day are allowed as extra work.
-            if (dayTotals[i] > 0 && capacity[i] == 0 && dayTypes[i] != DayType.O)
+            if (dayTotals[i] > 0 && capacity[i] == 0)
                 errors.Add($"{label} is {DayLabel(dayTypes[i])} but has {dayTotals[i]:0.##} h logged.");
 
             // Same rule the My Timesheet screen applies before enabling Submit:

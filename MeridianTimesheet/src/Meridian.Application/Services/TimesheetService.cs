@@ -326,9 +326,9 @@ public class TimesheetService(
 		var weekStart = WeekMath.MondayOf(date);
 		await EnsureWeekEditableAsync(employee.EmployeeId, employeeCode, weekStart, ct);
 
-		// DAY STATUS (Nov 2026): the employee picks Working, Leave or WFH for a day.
-		if (!Enum.TryParse<DayType>(dayType, out var parsed) || parsed is not (DayType.W or DayType.WFH or DayType.L))
-			throw new BusinessRuleException("A day can only be set to Working, Leave or WFH.");
+		// DAY STATUS (Nov 2026): the employee picks Working, Leave, Half Day Leave or WFH for a day.
+		if (!Enum.TryParse<DayType>(dayType, out var parsed) || parsed is not (DayType.W or DayType.WFH or DayType.L or DayType.LH))
+			throw new BusinessRuleException("A day can only be set to Working, Leave, Half Day Leave or WFH.");
 
 		// WEEK OFFS (Nov 2026): W-OFF and holidays come from the employee's own
 		// week offs (company default or their client's), so ask the resolver.
@@ -339,20 +339,30 @@ public class TimesheetService(
 		if (resolvedDay.DayType == nameof(DayType.H))
 			throw new BusinessRuleException($"{date:d MMM} is a holiday and can't be changed here.");
 
-		// A leave day holds no hours - the employee clears that day's hours first.
-		if (parsed is DayType.L)
+		// A leave day holds no hours, a half-day leave at most half a day - the
+		// employee reduces that day's hours first.
+		if (parsed is DayType.L or DayType.LH)
 		{
 			var entries = await timeEntryRepository.GetForWeekAsync(employee.EmployeeId, weekStart, ct);
 			var loggedHours = entries.Sum(e => e.HoursByDay[dayIndex]);
-			if (loggedHours > 0)
+			if (parsed is DayType.L && loggedHours > 0)
 				throw new BusinessRuleException(
 					$"{date:ddd d MMM} already has {loggedHours:0.##} h logged. Clear those hours first, then mark the day as Leave.");
+			var halfDay = WeekMath.StandardHoursPerDay / 2;
+			if (parsed is DayType.LH && loggedHours > halfDay)
+				throw new BusinessRuleException(
+					$"{date:ddd d MMM} already has {loggedHours:0.##} h logged. Reduce it to {halfDay:0.##} h first, then mark the day as Half Day Leave.");
 		}
 
 		await dayTypeRepository.SetAsync(employee.EmployeeId, date, parsed, ct);
 		await dayTypeRepository.SaveChangesAsync(ct);
 
-		var capacity = parsed is DayType.W or DayType.WFH ? WeekMath.StandardHoursPerDay : 0m;
+		var capacity = parsed switch
+		{
+			DayType.W or DayType.WFH => WeekMath.StandardHoursPerDay,
+			DayType.LH => WeekMath.StandardHoursPerDay / 2,
+			_ => 0m,
+		};
 		return new DayTypeDto(date, parsed.ToString(), capacity, CanChange: true);
 	}
 
@@ -416,9 +426,8 @@ public class TimesheetService(
 			var otherLinesTotal = entries
 				.Where(e => e.TimeEntryId != excludeEntryId)
 				.Sum(e => e.HoursByDay[i]);
-			// WEEK OFFS (Nov 2026): a W-OFF day has no required hours, but up to
-			// a normal day's hours can be logged there as extra work.
-			var capacity = dayTypes[i].DayType == nameof(DayType.O) ? WeekMath.StandardHoursPerDay : dayTypes[i].CapacityHours;
+			// A W-OFF day has 0 h, so no hours can be added on it.
+			var capacity = dayTypes[i].CapacityHours;
 			if (otherLinesTotal + newHours[i] <= capacity) continue;
 
 			var left = Math.Max(0m, capacity - otherLinesTotal);
