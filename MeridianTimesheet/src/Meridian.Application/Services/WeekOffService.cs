@@ -184,9 +184,24 @@ public class WeekOffService(
 	{
 		var clientWeekOffs = await weekOffRepository.GetClientWeekOffsAsync(ct);
 
+		// Drop-down values: active employees as "Name (Code)" - the code in
+		// brackets tells apart two people with the same name - and the
+		// clients that have week offs set up.
+		var employeeOptions = (await employeeRepository.GetAllAsync(ct))
+			.Where(e => e.IsActive)
+			.OrderBy(e => e.FullName)
+			.Select(e => $"{e.FullName} ({e.EmployeeCode})")
+			.ToList();
+		var clientOptions = clientWeekOffs
+			.Select(c => c.Account?.Name?.Trim() ?? "")
+			.Where(name => name.Length > 0)
+			.Distinct(StringComparer.OrdinalIgnoreCase)
+			.OrderBy(name => name)
+			.ToList();
+
 		using var workbook = new XLWorkbook();
 		var sheet = workbook.Worksheets.Add("Employees");
-		var headers = new[] { "Employee Code", "Client Name", "From (DD-MM-YYYY)", "To (DD-MM-YYYY)" };
+		var headers = new[] { "Employee Name", "Client Name", "From (DD-MM-YYYY)", "To (DD-MM-YYYY)" };
 		for (var col = 1; col <= headers.Length; col++)
 		{
 			var cell = sheet.Cell(1, col);
@@ -195,7 +210,7 @@ public class WeekOffService(
 			cell.Style.Font.FontColor = XLColor.White;
 			cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#173A5E");
 		}
-		sheet.Column(1).Width = 16;
+		sheet.Column(1).Width = 40;
 		sheet.Column(2).Width = 30;
 		sheet.Column(3).Width = 20;
 		sheet.Column(4).Width = 20;
@@ -207,8 +222,8 @@ public class WeekOffService(
 		var lines = new[]
 		{
 			"One row per employee per period.",
-			"Employee Code - e.g. CBT1274.",
-			"Client Name - must be one of the clients listed below (set up in Week Offs first).",
+			"Employee Name - pick from the drop-down.",
+			"Client Name - pick from the drop-down (only clients with week offs set up are listed).",
 			"From - first day the employee works for this client (DD-MM-YYYY). Required.",
 			"To - last day (DD-MM-YYYY). Leave empty if there is no end date.",
 			"An employee's periods must not overlap, even across different clients.",
@@ -234,6 +249,20 @@ public class WeekOffService(
 		}
 		help.Column(1).Width = 90;
 		help.Column(2).Width = 40;
+
+		// Hidden sheet that holds the drop-down lists.
+		var lists = workbook.Worksheets.Add("Lists");
+		for (var i = 0; i < employeeOptions.Count; i++)
+			lists.Cell(i + 1, 1).Value = employeeOptions[i];
+		for (var i = 0; i < clientOptions.Count; i++)
+			lists.Cell(i + 1, 2).Value = clientOptions[i];
+		lists.Hide();
+
+		const int lastTemplateRow = 1000;
+		if (employeeOptions.Count > 0)
+			AddDropDown(sheet.Range(2, 1, lastTemplateRow, 1), lists.Range(1, 1, employeeOptions.Count, 1), "Pick an employee from the list.");
+		if (clientOptions.Count > 0)
+			AddDropDown(sheet.Range(2, 2, lastTemplateRow, 2), lists.Range(1, 2, clientOptions.Count, 2), "Pick a client from the list.");
 
 		using var stream = new MemoryStream();
 		workbook.SaveAs(stream);
@@ -266,7 +295,7 @@ public class WeekOffService(
 				var rowNumber = excelRow.RowNumber();
 				if (rowNumber == 1) continue; // header
 
-				var code = excelRow.Cell(1).GetString().Trim();
+				var code = ReadEmployeeCode(excelRow.Cell(1).GetString());
 				var clientName = excelRow.Cell(2).GetString().Trim();
 				if (code.Length == 0 && clientName.Length == 0 && excelRow.Cell(3).IsEmpty())
 					continue; // empty line
@@ -347,6 +376,29 @@ public class WeekOffService(
 				(clash.EffectiveTo is DateOnly clashEnd ? $" to {clashEnd:dd-MM-yyyy}" : " (no end date)") +
 				" - the dates overlap. Set an end date on that one first.");
 		return days;
+	}
+
+	/// <summary>Adds an in-cell drop-down to the cells, using the values in listRange.</summary>
+	private static void AddDropDown(IXLRange cells, IXLRange listRange, string errorMessage)
+	{
+		var validation = cells.CreateDataValidation();
+		validation.List(listRange, true);
+		validation.ErrorTitle = "Not in the list";
+		validation.ErrorMessage = errorMessage;
+	}
+
+	/// <summary>
+	/// The Employee Name cell holds "Name (CBT1274)" from the drop-down - the
+	/// code is the part in the last brackets. A plain code ("CBT1274") from
+	/// older files is used as it is.
+	/// </summary>
+	private static string ReadEmployeeCode(string cellText)
+	{
+		var text = cellText.Trim();
+		var open = text.LastIndexOf('(');
+		if (text.EndsWith(')') && open >= 0)
+			return text.Substring(open + 1, text.Length - open - 2).Trim();
+		return text;
 	}
 
 	/// <summary>Checks one employee can be assigned for these dates and returns them.</summary>
