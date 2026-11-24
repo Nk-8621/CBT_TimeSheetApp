@@ -84,6 +84,12 @@ public interface IMasterDataService
 	Task<HolidayDto> UpdateHolidayAsync(int holidayId, UpdateHolidayRequest request, CancellationToken ct = default);
 	Task DeleteHolidayAsync(int holidayId, CancellationToken ct = default);
 
+	// REMOVE (Nov 2026): only allowed when nothing uses the record - otherwise
+	// a BusinessRuleException says what still uses it.
+	Task DeleteDepartmentAsync(int departmentId, CancellationToken ct = default);
+	Task DeleteAccountAsync(int accountId, CancellationToken ct = default);
+	Task DeleteProjectAsync(int projectId, CancellationToken ct = default);
+
 	// ---- Project-wise resource allocation (admin reporting) ----
 	Task<IReadOnlyList<ProjectResourceAllocationDto>> GetProjectResourceAllocationsAsync(CancellationToken ct = default);
 	Task<IReadOnlyList<AllocatedEmployeeDto>> GetAllocatedEmployeesAsync(int projectId, CancellationToken ct = default);

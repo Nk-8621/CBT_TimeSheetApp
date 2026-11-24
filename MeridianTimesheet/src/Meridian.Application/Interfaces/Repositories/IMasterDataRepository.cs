@@ -51,6 +51,23 @@ public interface IMasterDataRepository
 	Task AddTaskAsync(WorkTask task, CancellationToken ct = default);
 	Task AddHolidayAsync(Holiday holiday, CancellationToken ct = default);
 	void RemoveHoliday(Holiday holiday);
+
+	// ---- REMOVE (Nov 2026): what still uses a department / client / project ----
+	/// <summary>Employees whose main or extra department this is.</summary>
+	Task<int> CountEmployeesInDepartmentAsync(int departmentId, CancellationToken ct = default);
+	Task<int> CountAccountsInDepartmentAsync(int departmentId, CancellationToken ct = default);
+	Task<int> CountChildDepartmentsAsync(int departmentId, CancellationToken ct = default);
+	Task<int> CountProjectsForAccountAsync(int accountId, CancellationToken ct = default);
+	Task<int> CountEmployeesWithPrimaryAccountAsync(int accountId, CancellationToken ct = default);
+	Task<int> CountHolidaysForAccountAsync(int accountId, CancellationToken ct = default);
+	/// <summary>Custom week offs set up for the client plus employees added under them.</summary>
+	Task<int> CountWeekOffsForAccountAsync(int accountId, CancellationToken ct = default);
+	Task<int> CountTimeEntriesForProjectAsync(int projectId, CancellationToken ct = default);
+	Task<int> CountUserStoriesForProjectAsync(int projectId, CancellationToken ct = default);
+	Task<int> CountAllocationsForProjectAsync(int projectId, CancellationToken ct = default);
+	void RemoveDepartment(Department department);
+	void RemoveAccount(Account account);
+	void RemoveProject(Project project);
 	void RemoveModule(Module module);
 	void RemoveTask(WorkTask task);
 	Task AddProjectTypeAsync(ProjectType projectType, CancellationToken ct = default);

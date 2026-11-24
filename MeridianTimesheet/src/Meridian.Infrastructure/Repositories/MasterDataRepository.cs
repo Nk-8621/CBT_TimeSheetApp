@@ -137,6 +137,45 @@ public class MasterDataRepository(MeridianDbContext db) : IMasterDataRepository
 
 	public void RemoveHoliday(Holiday holiday) => db.Holidays.Remove(holiday);
 
+	// ---- REMOVE (Nov 2026): what still uses a department / client / project ----
+	public Task<int> CountEmployeesInDepartmentAsync(int departmentId, CancellationToken ct = default) =>
+		db.Employees.CountAsync(e => e.DepartmentId == departmentId
+			|| db.EmployeeDepartments.Any(ed => ed.EmployeeId == e.EmployeeId && ed.DepartmentId == departmentId), ct);
+
+	public Task<int> CountAccountsInDepartmentAsync(int departmentId, CancellationToken ct = default) =>
+		db.Accounts.CountAsync(a => a.DepartmentId == departmentId, ct);
+
+	public Task<int> CountChildDepartmentsAsync(int departmentId, CancellationToken ct = default) =>
+		db.Departments.CountAsync(d => d.ParentDepartmentId == departmentId, ct);
+
+	public Task<int> CountProjectsForAccountAsync(int accountId, CancellationToken ct = default) =>
+		db.Projects.CountAsync(p => p.AccountId == accountId, ct);
+
+	public Task<int> CountEmployeesWithPrimaryAccountAsync(int accountId, CancellationToken ct = default) =>
+		db.Employees.CountAsync(e => e.PrimaryAccountId == accountId, ct);
+
+	public Task<int> CountHolidaysForAccountAsync(int accountId, CancellationToken ct = default) =>
+		db.Holidays.CountAsync(h => h.AccountId == accountId, ct);
+
+	public async Task<int> CountWeekOffsForAccountAsync(int accountId, CancellationToken ct = default) =>
+		await db.ClientWeekOffs.CountAsync(w => w.AccountId == accountId, ct)
+		+ await db.EmployeeWeekOffs.CountAsync(w => w.AccountId == accountId, ct);
+
+	public Task<int> CountTimeEntriesForProjectAsync(int projectId, CancellationToken ct = default) =>
+		db.TimeEntries.CountAsync(t => t.ProjectId == projectId, ct);
+
+	public Task<int> CountUserStoriesForProjectAsync(int projectId, CancellationToken ct = default) =>
+		db.UserStories.CountAsync(s => s.ProjectId == projectId, ct);
+
+	public Task<int> CountAllocationsForProjectAsync(int projectId, CancellationToken ct = default) =>
+		db.EmployeeProjectAllocations.CountAsync(a => a.ProjectId == projectId, ct);
+
+	public void RemoveDepartment(Department department) => db.Departments.Remove(department);
+
+	public void RemoveAccount(Account account) => db.Accounts.Remove(account);
+
+	public void RemoveProject(Project project) => db.Projects.Remove(project);
+
 	public void RemoveModule(Module module) => db.Modules.Remove(module);
 
 	public void RemoveTask(WorkTask task) => db.Tasks.Remove(task);

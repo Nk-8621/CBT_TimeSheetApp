@@ -765,6 +765,98 @@ public class MasterDataService(IMasterDataRepository repository, ITimeEntryRepos
 		await repository.SaveChangesAsync(ct);
 	}
 
+	// ---- REMOVE (Nov 2026): department / client / project ----
+	// Each can only be removed when nothing uses it. Otherwise the message
+	// lists what still does, so the admin knows what to move first.
+
+	public async Task DeleteDepartmentAsync(int departmentId, CancellationToken ct = default)
+	{
+		var department = await repository.GetDepartmentByIdAsync(departmentId, ct)
+			?? throw new EntityNotFoundException(nameof(Department), departmentId);
+
+		var inUse = UsageList(
+			(await repository.CountEmployeesInDepartmentAsync(departmentId, ct), "employee"),
+			(await repository.CountAccountsInDepartmentAsync(departmentId, ct), "customer / internal account"),
+			(await repository.CountChildDepartmentsAsync(departmentId, ct), "sub-department"));
+		if (inUse is not null)
+			throw new BusinessRuleException(
+				$"{department.Name} can't be removed - {inUse} still use it. Remove them or move them to another department first.");
+
+		repository.RemoveDepartment(department);
+		await repository.SaveChangesAsync(ct);
+	}
+
+	public async Task DeleteAccountAsync(int accountId, CancellationToken ct = default)
+	{
+		var account = await repository.GetAccountByIdAsync(accountId, ct)
+			?? throw new EntityNotFoundException(nameof(Account), accountId);
+
+		var inUse = UsageList(
+			(await repository.CountProjectsForAccountAsync(accountId, ct), "project"),
+			(await repository.CountEmployeesWithPrimaryAccountAsync(accountId, ct), "employee (primary client)"),
+			(await repository.CountHolidaysForAccountAsync(accountId, ct), "holiday"),
+			(await repository.CountWeekOffsForAccountAsync(accountId, ct), "custom week off entry"));
+		if (inUse is not null)
+			throw new BusinessRuleException(
+				$"{account.Name} can't be removed - {inUse} still use it. Remove them or move them to another client first.");
+
+		repository.RemoveAccount(account);
+		await repository.SaveChangesAsync(ct);
+	}
+
+	public async Task DeleteProjectAsync(int projectId, CancellationToken ct = default)
+	{
+		var project = await repository.GetProjectByIdAsync(projectId, ct)
+			?? throw new EntityNotFoundException(nameof(Project), projectId);
+
+		var lines = await repository.CountTimeEntriesForProjectAsync(projectId, ct);
+		if (lines > 0)
+			throw new BusinessRuleException(
+				$"{project.Name} can't be removed - it has {lines} timesheet line(s). Mark it inactive instead, so its history is kept.");
+
+		var inUse = UsageList(
+			(await repository.CountUserStoriesForProjectAsync(projectId, ct), "user story"),
+			(await repository.CountAllocationsForProjectAsync(projectId, ct), "allocated employee"));
+		if (inUse is not null)
+			throw new BusinessRuleException(
+				$"{project.Name} can't be removed - {inUse} still use it. Remove them first.");
+
+		// The project's own modules and task types go with it (none of them can
+		// have timesheet lines - checked above). Task -> Module is ON DELETE
+		// RESTRICT, so tasks first, then modules, then the project.
+		var modules = await repository.GetModulesAsync(projectId, ct);
+		foreach (var module in modules)
+		{
+			var tasks = await repository.GetTasksAsync(module.ModuleId, ct);
+			foreach (var task in tasks)
+			{
+				var trackedTask = await repository.GetTaskByIdAsync(task.TaskId, ct);
+				if (trackedTask is not null) repository.RemoveTask(trackedTask);
+			}
+			var trackedModule = await repository.GetModuleByIdAsync(module.ModuleId, ct);
+			if (trackedModule is not null) repository.RemoveModule(trackedModule);
+		}
+		repository.RemoveProject(project);
+		await repository.SaveChangesAsync(ct);
+	}
+
+	/// <summary>[(4, "employee"), (0, "account")] -> "4 employees"; null when all are 0.</summary>
+	private static string? UsageList(params (int Count, string Name)[] items)
+	{
+		var parts = items
+			.Where(i => i.Count > 0)
+			.Select(i => i.Count == 1 ? $"1 {i.Name}" : $"{i.Count} {Plural(i.Name)}")
+			.ToList();
+		return parts.Count == 0 ? null : string.Join(" and ", parts);
+	}
+
+	private static string Plural(string name) => name switch
+	{
+		"employee (primary client)" => "employees (primary client)",
+		"user story" => "user stories",
+		_ => name + "s",
+	};
+
 	// ---- Project-wise resource allocation (admin reporting) ----
 
 	public async Task<IReadOnlyList<ProjectResourceAllocationDto>> GetProjectResourceAllocationsAsync(CancellationToken ct = default)

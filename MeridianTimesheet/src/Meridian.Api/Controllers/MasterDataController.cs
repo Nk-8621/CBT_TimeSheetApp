@@ -10,8 +10,8 @@ namespace Meridian.Api.Controllers;
 /// (Departments/Accounts/Projects/Modules/Tasks/Holidays/Project Types -
 /// Admin role only). The "Others" quick-add endpoints are the one exception -
 /// any authenticated employee can call those from Add Task Line, not just
-/// admins. Locations stay read-only. Departments can be added and edited
-/// but not deleted, because employees, accounts and projects point at them.</summary>
+/// admins. Locations stay read-only. Departments, accounts and projects can
+/// only be removed when nothing uses them (the service checks and says why).</summary>
 [ApiController]
 [Route("api/masterdata")]
 [Authorize]
@@ -217,6 +217,32 @@ public class MasterDataController(IMasterDataService masterDataService, ICurrent
 	{
 		if (!currentUser.IsAdmin) return Forbid();
 		return Ok(await masterDataService.UpdateHolidayAsync(holidayId, request, ct));
+	}
+
+	// ---- REMOVE (Nov 2026): only when nothing uses the record (Admin only) ----
+
+	[HttpDelete("departments/{departmentId:int}")]
+	public async Task<IActionResult> DeleteDepartment(int departmentId, CancellationToken ct)
+	{
+		if (!currentUser.IsAdmin) return Forbid();
+		await masterDataService.DeleteDepartmentAsync(departmentId, ct);
+		return NoContent();
+	}
+
+	[HttpDelete("accounts/{accountId:int}")]
+	public async Task<IActionResult> DeleteAccount(int accountId, CancellationToken ct)
+	{
+		if (!currentUser.IsAdmin) return Forbid();
+		await masterDataService.DeleteAccountAsync(accountId, ct);
+		return NoContent();
+	}
+
+	[HttpDelete("projects/{projectId:int}")]
+	public async Task<IActionResult> DeleteProject(int projectId, CancellationToken ct)
+	{
+		if (!currentUser.IsAdmin) return Forbid();
+		await masterDataService.DeleteProjectAsync(projectId, ct);
+		return NoContent();
 	}
 
 	[HttpDelete("holidays/{holidayId:int}")]
