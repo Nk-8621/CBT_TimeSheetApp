@@ -300,6 +300,7 @@ public class MasterDataService(IMasterDataRepository repository, ITimeEntryRepos
 			Name = request.Name,
 			DepartmentId = request.DepartmentId,
 			AccountType = accountType,
+			WeekOffDays = request.WeekOffDays is null ? "Sat,Sun" : ReadAccountWeekOffDays(request.WeekOffDays),
 			CreatedAt = DateTime.UtcNow,
 		};
 		await repository.AddAccountAsync(account, ct);
@@ -315,6 +316,7 @@ public class MasterDataService(IMasterDataRepository repository, ITimeEntryRepos
 		if (request.Name is not null) account.Name = request.Name;
 		if (request.DepartmentId is int deptId) { await RequireDepartmentExistsAsync(deptId, ct); account.DepartmentId = deptId; }
 		if (request.AccountType is not null) account.AccountType = ParseAccountType(request.AccountType);
+		if (request.WeekOffDays is not null) account.WeekOffDays = ReadAccountWeekOffDays(request.WeekOffDays);
 		account.UpdatedAt = DateTime.UtcNow;
 
 		await repository.SaveChangesAsync(ct);
@@ -883,6 +885,19 @@ public class MasterDataService(IMasterDataRepository repository, ITimeEntryRepos
 			throw new BusinessRuleException($"Default classification must be one of: {string.Join(", ", BillingClassificationRules.Classifications)} (got \"{defaultBillable}\").");
 	}
 
+	/// <summary>CLIENT WEEK OFF (Nov 2026): ["Sat", "Sun"] -> "Sat,Sun" (same
+	/// rules as a custom week off: 1 to 3 days).</summary>
+	private static string ReadAccountWeekOffDays(string[] values)
+	{
+		var days = WeekOffDays.TryParse(values)
+			?? throw new BusinessRuleException("Week off days must be day names like Sat,Sun.");
+		if (days.Count == 0)
+			throw new BusinessRuleException("Pick at least one week off day.");
+		if (days.Count > 3)
+			throw new BusinessRuleException("At most 3 week off days can be set.");
+		return WeekOffDays.Format(days);
+	}
+
 	private static AccountType ParseAccountType(string value) =>
 		Enum.TryParse<AccountType>(value, out var parsed)
 			? parsed
@@ -895,7 +910,8 @@ public class MasterDataService(IMasterDataRepository repository, ITimeEntryRepos
 			m.TaskTemplates.OrderBy(x => x.SortOrder).Select(x => new ProjectTypeTaskTemplateDto(x.ProjectTypeTaskTemplateId, x.Name, x.SortOrder)).ToList()
 		)).ToList());
 
-	private static AccountDto ToDto(Account a) => new(a.AccountId, a.DepartmentId, a.Name, a.AccountType.ToString());
+	private static AccountDto ToDto(Account a) => new(a.AccountId, a.DepartmentId, a.Name, a.AccountType.ToString(),
+		WeekOffDays.ToShortNames(WeekOffDays.Parse(a.WeekOffDays)));
 
 	private static ProjectDto ToDto(Project p) => new(
 		p.ProjectId, p.AccountId, p.Code, p.Name, p.DefaultBillable, p.IsActive,

@@ -5,7 +5,8 @@ public record DepartmentDto(int Id, string Code, string Name, int? ParentDepartm
 /// three. ParentDepartmentId null = a top-level department.</summary>
 public record SaveDepartmentRequest(string Code, string Name, int? ParentDepartmentId);
 public record LocationDto(int Id, string Code, string Name);
-public record AccountDto(int Id, int DepartmentId, string Name, string AccountType);
+/// <summary>WeekOffDays = the client's default week off, e.g. ["Sat", "Sun"].</summary>
+public record AccountDto(int Id, int DepartmentId, string Name, string AccountType, string[] WeekOffDays);
 
 public record ProjectDto(
 	int Id, int AccountId, string Code, string Name, string DefaultBillable, bool IsActive,
@@ -41,8 +42,10 @@ public record UpdateProjectTypeTaskTemplateRequest(string? Name, int? SortOrder)
 
 // ---- Admin-only create/update requests (Master Data screen) ----
 
-public record CreateAccountRequest(int DepartmentId, string Name, string AccountType);
-public record UpdateAccountRequest(int? DepartmentId, string? Name, string? AccountType);
+/// <summary>WeekOffDays e.g. ["Sat", "Sun"]. Left out on create = Sat, Sun;
+/// left out on update = unchanged.</summary>
+public record CreateAccountRequest(int DepartmentId, string Name, string AccountType, string[]? WeekOffDays = null);
+public record UpdateAccountRequest(int? DepartmentId, string? Name, string? AccountType, string[]? WeekOffDays = null);
 
 /// <summary>ProjectTypeId, if supplied, auto-generates the full real Module
 /// (Level-1) / Task (Level-2) tree from that type's template under the new

@@ -41,6 +41,7 @@ public class AccountConfiguration : IEntityTypeConfiguration<Account>
         builder.HasKey(a => a.AccountId);
         builder.Property(a => a.Name).HasMaxLength(200).IsRequired();
         builder.Property(a => a.AccountType).HasConversion<string>().HasMaxLength(20).IsRequired();
+        builder.Property(a => a.WeekOffDays).HasMaxLength(30).IsRequired();
         builder.HasIndex(a => a.Name).IsUnique();
 
         builder.HasOne(a => a.Department)

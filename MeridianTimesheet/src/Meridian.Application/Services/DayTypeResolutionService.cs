@@ -37,18 +37,26 @@ public class DayTypeResolutionService(
 			? []
 			: await weekOffRepository.GetClientWeekOffsForAccountsAsync(weekOffRecords.Select(w => w.AccountId).Distinct().ToList(), ct);
 
+		// CLIENT WEEK OFF (Nov 2026): employees not in a custom week off follow
+		// their primary client's default week off; no primary client -> Sat, Sun.
+		var primaryAccount = primaryAccountId is int accountId
+			? await masterDataRepository.GetAccountByIdAsync(accountId, ct)
+			: null;
+		var defaultWeekOffDays = primaryAccount is null ? [] : WeekOffDays.Parse(primaryAccount.WeekOffDays);
+		if (defaultWeekOffDays.Count == 0) defaultWeekOffDays = WeekOffDays.CompanyDefault.ToList();
+
 		var result = new List<DayTypeDto>(7);
 		foreach (var date in days)
 		{
-			// WEEK OFFS (Nov 2026): assigned to a client on this day -> that client's
+			// WEEK OFFS (Nov 2026): in a custom week off on this day -> its
 			// week-off days (for this date) and only that client's holidays.
-			// Not assigned -> company default Sat + Sun, and company-wide holidays
-			// plus their primary client's (same rule as before).
+			// Otherwise -> the primary client's default week off (see above), and
+			// company-wide holidays plus their primary client's (same rule as before).
 			var weekOff = weekOffRecords.FirstOrDefault(w => w.EffectiveFrom <= date && (w.EffectiveTo == null || w.EffectiveTo >= date));
 			var clientDays = weekOff is null
 				? null
 				: clientWeekOffs.FirstOrDefault(c => c.AccountId == weekOff.AccountId && c.EffectiveFrom <= date && (c.EffectiveTo == null || c.EffectiveTo >= date));
-			var weekOffDays = clientDays is null ? WeekOffDays.CompanyDefault.ToList() : WeekOffDays.Parse(clientDays.WeekOffDays);
+			var weekOffDays = clientDays is null ? defaultWeekOffDays : WeekOffDays.Parse(clientDays.WeekOffDays);
 			var isWeekOff = weekOffDays.Contains(date.DayOfWeek);
 			var isHoliday = weekOff is null
 				? weekHolidays.Any(h => h.HolidayDate == date && (h.AccountId == null || h.AccountId == primaryAccountId))
