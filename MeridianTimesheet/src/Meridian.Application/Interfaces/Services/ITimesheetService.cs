@@ -15,8 +15,19 @@ public interface ITimesheetService
 	Task<IReadOnlyList<WeekHistoryItemDto>> GetHistoryAsync(string employeeCode, CancellationToken ct = default);
 
 	Task<TimeEntryDto> AddEntryAsync(string employeeCode, DateOnly weekStartDate, CreateTimeEntryRequest request, CancellationToken ct = default);
+
+	/// <summary>Adds a task under one of the employee's user stories: the task
+	/// name plus hours per day. Project comes from the story; Module and Task
+	/// are the project's "General" pair. Same rules as AddEntryAsync.</summary>
+	Task<TimeEntryDto> AddStoryTaskAsync(string employeeCode, DateOnly weekStartDate, CreateStoryTaskRequest request, CancellationToken ct = default);
 	Task<TimeEntryDto> UpdateEntryAsync(int timeEntryId, UpdateTimeEntryRequest request, CancellationToken ct = default);
 	Task RemoveEntryAsync(int timeEntryId, CancellationToken ct = default);
+
+	/// <summary>The EmployeeCode that owns this time entry, or null if the entry
+	/// doesn't exist - lets the controller apply the same "your own data, or
+	/// Admin" check to the by-id Update/Remove endpoints that every other
+	/// timesheet endpoint applies via the employeeCode in its route.</summary>
+	Task<string?> GetEntryOwnerCodeAsync(int timeEntryId, CancellationToken ct = default);
 
 	Task<DayTypeDto> SetDayTypeAsync(string employeeCode, DateOnly date, string dayType, CancellationToken ct = default);
 

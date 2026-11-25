@@ -35,6 +35,21 @@ public class TimeEntryConfiguration : IEntityTypeConfiguration<TimeEntry>
         builder.HasOne(t => t.Project).WithMany().HasForeignKey(t => t.ProjectId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(t => t.Module).WithMany().HasForeignKey(t => t.ModuleId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(t => t.Task).WithMany().HasForeignKey(t => t.TaskId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(t => t.UserStory).WithMany().HasForeignKey(t => t.UserStoryId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+public class UserStoryConfiguration : IEntityTypeConfiguration<UserStory>
+{
+    public void Configure(EntityTypeBuilder<UserStory> builder)
+    {
+        builder.ToTable("Carbynetech_UserStory");
+        builder.HasKey(s => s.UserStoryId);
+        builder.Property(s => s.Name).HasMaxLength(200).IsRequired();
+        builder.HasIndex(s => s.EmployeeId);
+
+        builder.HasOne(s => s.Employee).WithMany().HasForeignKey(s => s.EmployeeId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(s => s.Project).WithMany().HasForeignKey(s => s.ProjectId).OnDelete(DeleteBehavior.Restrict);
     }
 }
 
@@ -102,5 +117,34 @@ public class ApprovalEventConfiguration : IEntityTypeConfiguration<ApprovalEvent
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne(a => a.ActedBy).WithMany().HasForeignKey(a => a.ActedByEmployeeId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+// WEEK OFFS (Nov 2026): created by scripts 35 and 36 (Claude outputs).
+public class ClientWeekOffConfiguration : IEntityTypeConfiguration<ClientWeekOff>
+{
+    public void Configure(EntityTypeBuilder<ClientWeekOff> builder)
+    {
+        builder.ToTable("Carbynetech_ClientWeekOff");
+        builder.HasKey(w => w.ClientWeekOffId);
+        builder.Property(w => w.WeekOffDays).HasMaxLength(30).IsRequired();
+        builder.HasIndex(w => w.AccountId);
+
+        builder.HasOne(w => w.Account).WithMany().HasForeignKey(w => w.AccountId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(w => w.CreatedBy).WithMany().HasForeignKey(w => w.CreatedByEmployeeId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+public class EmployeeWeekOffConfiguration : IEntityTypeConfiguration<EmployeeWeekOff>
+{
+    public void Configure(EntityTypeBuilder<EmployeeWeekOff> builder)
+    {
+        builder.ToTable("Carbynetech_EmployeeWeekOff");
+        builder.HasKey(w => w.EmployeeWeekOffId);
+        builder.HasIndex(w => w.EmployeeId);
+
+        builder.HasOne(w => w.Employee).WithMany().HasForeignKey(w => w.EmployeeId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(w => w.Account).WithMany().HasForeignKey(w => w.AccountId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(w => w.CreatedBy).WithMany().HasForeignKey(w => w.CreatedByEmployeeId).OnDelete(DeleteBehavior.Restrict);
     }
 }

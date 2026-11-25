@@ -1,0 +1,44 @@
+using Meridian.Application.DTOs;
+using Meridian.Application.Interfaces.Services;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
+namespace Meridian.Api.Controllers;
+
+[ApiController]
+[Route("api/user-stories")]
+[Authorize]
+public class UserStoriesController(IUserStoryService userStoryService, ICurrentUserService currentUser)
+	: MeridianControllerBase(currentUser)
+{
+	[HttpGet("{employeeCode}")]
+	public async Task<IActionResult> GetForEmployee(string employeeCode, CancellationToken ct)
+	{
+		if (EnsureSelfOrAdmin(employeeCode) is IActionResult denied) return denied;
+		return Ok(await userStoryService.GetForEmployeeAsync(employeeCode, ct));
+	}
+
+	[HttpPost("{employeeCode}")]
+	public async Task<IActionResult> Create(string employeeCode, [FromBody] CreateUserStoryRequest request, CancellationToken ct)
+	{
+		if (EnsureSelfOrAdmin(employeeCode) is IActionResult denied) return denied;
+		var created = await userStoryService.CreateAsync(employeeCode, request, ct);
+		return CreatedAtAction(nameof(GetForEmployee), new { employeeCode }, created);
+	}
+
+	[HttpPut("{employeeCode}/{userStoryId:int}")]
+	public async Task<IActionResult> Update(string employeeCode, int userStoryId, [FromBody] UpdateUserStoryRequest request, CancellationToken ct)
+	{
+		if (EnsureSelfOrAdmin(employeeCode) is IActionResult denied) return denied;
+		return Ok(await userStoryService.UpdateAsync(employeeCode, userStoryId, request, ct));
+	}
+
+	/// <summary>Deletes a story with no tasks in any week (400 if it has tasks).</summary>
+	[HttpDelete("{employeeCode}/{userStoryId:int}")]
+	public async Task<IActionResult> Delete(string employeeCode, int userStoryId, CancellationToken ct)
+	{
+		if (EnsureSelfOrAdmin(employeeCode) is IActionResult denied) return denied;
+		await userStoryService.DeleteAsync(employeeCode, userStoryId, ct);
+		return NoContent();
+	}
+}

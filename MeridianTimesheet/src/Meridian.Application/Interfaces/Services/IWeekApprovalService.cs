@@ -12,8 +12,8 @@ public interface IWeekApprovalService
     Task<WeekRecordDto> SubmitAsync(string employeeCode, DateOnly weekStartDate, CancellationToken ct = default);
     Task<WeekRecordDto> RecallAsync(string employeeCode, DateOnly weekStartDate, CancellationToken ct = default);
 
-    Task<WeekRecordDto> ApproveLevel1Async(string employeeCode, DateOnly weekStartDate, string approverEmployeeCode, CancellationToken ct = default);
-    Task<WeekRecordDto> ApproveLevel2Async(string employeeCode, DateOnly weekStartDate, string approverEmployeeCode, CancellationToken ct = default);
+    Task<WeekRecordDto> ApproveLevel1Async(string employeeCode, DateOnly weekStartDate, string approverEmployeeCode, string? comment = null, CancellationToken ct = default);
+    Task<WeekRecordDto> ApproveLevel2Async(string employeeCode, DateOnly weekStartDate, string approverEmployeeCode, string? comment = null, CancellationToken ct = default);
     Task<WeekRecordDto> RejectAsync(string employeeCode, DateOnly weekStartDate, string approverEmployeeCode, string reason, CancellationToken ct = default);
 
     /// <summary>Weeks currently awaiting this approver's action (their Level 1 or
@@ -25,6 +25,11 @@ public interface IWeekApprovalService
     /// everything the Approvals screen needs in one call. Sorted flagged
     /// items first, matching the original wireframe.</summary>
     Task<IReadOnlyList<ApprovalQueueItemDto>> GetApprovalQueueAsync(string approverEmployeeCode, bool level2, CancellationToken ct = default);
+
+    /// <summary>Weeks this Level 1 manager approved that Level 2 then returned
+    /// to the employee. View only - once the employee resubmits, the week leaves
+    /// this list and is back in the normal Level 1 queue.</summary>
+    Task<IReadOnlyList<ApprovalQueueItemDto>> GetReturnedByLevel2Async(string level1ApproverEmployeeCode, CancellationToken ct = default);
 
 	Task<ApprovalQueueItemDto?> GetWeekDetailAsync(string employeeCode, DateOnly weekStartDate, CancellationToken ct = default);
 }

@@ -13,7 +13,15 @@ public class HolidayConfiguration : IEntityTypeConfiguration<Holiday>
         builder.Property(h => h.Name).HasMaxLength(150).IsRequired();
         builder.Property(h => h.Location).HasMaxLength(100).IsRequired();
         builder.Property(h => h.SourceSystem).HasMaxLength(20).IsRequired();
-        builder.HasIndex(h => new { h.HolidayDate, h.Location }).IsUnique();
+
+        // Includes AccountId so a client-specific holiday (e.g. "All India,
+        // scoped to just this one client's staff") can coexist with a
+        // company-wide holiday on the same date/location - only an exact
+        // (date, location, client) repeat is rejected. SQL Server treats two
+        // NULLs as equal for uniqueness, so this still allows only one
+        // company-wide (AccountId == null) entry per date/location, same as
+        // before.
+        builder.HasIndex(h => new { h.HolidayDate, h.Location, h.AccountId }).IsUnique();
     }
 }
 

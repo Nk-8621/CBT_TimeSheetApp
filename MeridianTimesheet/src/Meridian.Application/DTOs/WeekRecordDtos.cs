@@ -14,6 +14,11 @@ public record WeekRecordDto(
 
 public record RejectWeekRequest(string Reason);
 
+/// <summary>Optional body for approve-level1/approve-level2 - the approver's
+/// comment, shown on the week's approval trail (stored as that approval
+/// event's EventMeta, NVARCHAR(200)).</summary>
+public record ApproveWeekRequest(string? Comment);
+
 public record WeekValidationResult(IReadOnlyList<string> Errors, IReadOnlyList<string> Warnings)
 {
     public bool CanSubmit => Errors.Count == 0;

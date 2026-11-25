@@ -1,33 +1,102 @@
 namespace Meridian.Application.DTOs;
 
 public record DepartmentDto(int Id, string Code, string Name, int? ParentDepartmentId);
+/// <summary>Create and edit both send every field - the form always shows all
+/// three. ParentDepartmentId null = a top-level department.</summary>
+public record SaveDepartmentRequest(string Code, string Name, int? ParentDepartmentId);
 public record LocationDto(int Id, string Code, string Name);
-public record AccountDto(int Id, int DepartmentId, string Name, string AccountType);
-public record ProjectDto(int Id, int AccountId, string Code, string Name, bool DefaultBillable, bool IsActive);
-public record ModuleDto(int Id, int ProjectId, string Name, string TaskCategoryCode);
+/// <summary>WeekOffDays = the client's default week off, e.g. ["Sat", "Sun"].</summary>
+public record AccountDto(int Id, int DepartmentId, string Name, string AccountType, string[] WeekOffDays);
+
+public record ProjectDto(
+	int Id, int AccountId, string Code, string Name, string DefaultBillable, bool IsActive,
+	int? ProjectTypeId, string? ProjectTypeName, string? ProjectTech, string? BillingType,
+	string? CustomerPO, string? Notes, bool NeedsReview,
+	int? ProjectLeadEmployeeId, string? ProjectLeadEmployeeName,
+	int? ProjectManagerEmployeeId, string? ProjectManagerEmployeeName,
+	int? DeliveryHeadEmployeeId, string? DeliveryHeadEmployeeName);
+
+public record ModuleDto(int Id, int ProjectId, string Name, int? ProjectTypeId, string? ProjectTypeCode);
 public record WorkTaskDto(int Id, int ModuleId, string Name);
-//public record HolidayDto(int Id, DateOnly Date, string Name, string Location);
-public record TaskCategoryDto(int Id, string Code, string Name);
 
-// ---- Admin-only create/update requests (Section: Master Data CRUD) ----
+// ---- Project Type + its Level-1/Level-2 template ----
 
-public record CreateAccountRequest(int DepartmentId, string Name, string AccountType);
-public record UpdateAccountRequest(int? DepartmentId, string? Name, string? AccountType);
+public record ProjectTypeDto(int Id, string Code, string Name);
+public record ProjectTypeTaskTemplateDto(int Id, string Name, int SortOrder);
+public record ProjectTypeModuleTemplateDto(int Id, string Name, int SortOrder, IReadOnlyList<ProjectTypeTaskTemplateDto> Tasks);
+/// <summary>Full tree for the admin Project Type template-management screen.</summary>
+public record ProjectTypeWithTemplateDto(int Id, string Code, string Name, IReadOnlyList<ProjectTypeModuleTemplateDto> Modules);
 
-/// <summary>InitialModuleTaskCategoryCode, if supplied, auto-creates a "General"
-/// module under the new project, pre-populated with that category's standard
-/// task list (see Common/TaskTemplates.cs) — matching the original wireframe's
-/// behavior of a new project being immediately usable with no second setup
-/// step. Pass null/omit to create an empty project with no modules yet.</summary>
-public record CreateProjectRequest(int AccountId, string Code, string Name, bool DefaultBillable, string? InitialModuleTaskCategoryCode);
-public record UpdateProjectRequest(int? AccountId, string? Code, string? Name, bool? DefaultBillable, bool? IsActive);
+public record CreateProjectTypeRequest(string Code, string Name);
+public record UpdateProjectTypeRequest(string? Code, string? Name);
+/// <summary>Deleting a Project Type that any Project/Module still uses
+/// requires picking a replacement up front - every affected Project/Module
+/// gets reassigned to ReplacementProjectTypeId before the delete proceeds,
+/// so nothing is ever left orphaned.</summary>
+public record DeleteProjectTypeRequest(int? ReplacementProjectTypeId);
 
-public record CreateModuleRequest(int ProjectId, string Name, string TaskCategoryCode);
-public record UpdateModuleRequest(string? Name, string? TaskCategoryCode);
+public record CreateProjectTypeModuleTemplateRequest(int ProjectTypeId, string Name, int SortOrder);
+public record UpdateProjectTypeModuleTemplateRequest(string? Name, int? SortOrder);
+public record CreateProjectTypeTaskTemplateRequest(int ProjectTypeModuleTemplateId, string Name, int SortOrder);
+public record UpdateProjectTypeTaskTemplateRequest(string? Name, int? SortOrder);
+
+// ---- Admin-only create/update requests (Master Data screen) ----
+
+/// <summary>WeekOffDays e.g. ["Sat", "Sun"]. Left out on create = Sat, Sun;
+/// left out on update = unchanged.</summary>
+public record CreateAccountRequest(int DepartmentId, string Name, string AccountType, string[]? WeekOffDays = null);
+public record UpdateAccountRequest(int? DepartmentId, string? Name, string? AccountType, string[]? WeekOffDays = null);
+
+/// <summary>ProjectTypeId, if supplied, auto-generates the full real Module
+/// (Level-1) / Task (Level-2) tree from that type's template under the new
+/// project. Pass null/omit to create an empty project with no modules yet.</summary>
+public record CreateProjectRequest(
+	int AccountId, string Code, string Name, string DefaultBillable, int? ProjectTypeId,
+	string? ProjectTech = null, string? BillingType = null, string? CustomerPO = null, string? Notes = null,
+	int? ProjectLeadEmployeeId = null, int? ProjectManagerEmployeeId = null, int? DeliveryHeadEmployeeId = null);
+
+/// <summary>ProjectTypeId is retroactive-classification-only - the backend
+/// applies it ONLY when the project currently has no ProjectTypeId (one
+/// created before this feature, or without one). The moment it's applied,
+/// that type's Modules/Tasks are merged in (see UpdateProjectAsync /
+/// SyncProjectModulesFromTemplateAsync). Once a project has a ProjectTypeId
+/// this can no longer change it - the backend silently ignores it then.</summary>
+public record UpdateProjectRequest(
+	int? AccountId, string? Code, string? Name, string? DefaultBillable, bool? IsActive,
+	int? ProjectTypeId = null,
+	string? ProjectTech = null, string? BillingType = null, string? CustomerPO = null, string? Notes = null,
+	bool? NeedsReview = null,
+	int? ProjectLeadEmployeeId = null, int? ProjectManagerEmployeeId = null, int? DeliveryHeadEmployeeId = null);
+
+public record CreateModuleRequest(int ProjectId, string Name, int? ProjectTypeId = null);
+public record UpdateModuleRequest(string? Name, int? ProjectTypeId = null);
+
+/// <summary>How many timesheet lines use a Module or Task. Zero means it can
+/// be deleted; above zero, a rename also changes the name on those lines.</summary>
+public record MasterDataUsageDto(int TimeEntryCount);
 
 public record CreateTaskRequest(int ModuleId, string Name);
 public record UpdateTaskRequest(string? Name);
 
+/// <summary>Self-service "Others" quick-add from the timesheet entry screen
+/// (Add Task Line) - reachable by any authenticated employee, not just
+/// admins. Deliberately minimal (no account/type picking); the created
+/// Project lands in the "Pending Classification" internal account, flagged
+/// NeedsReview, for an admin to properly classify later.</summary>
+public record QuickAddProjectRequest(string Name);
+/// <summary>Not part of any Project Type's template - ProjectTypeId stays
+/// null on the created Module.</summary>
+public record QuickAddModuleRequest(int ProjectId, string Name);
+public record QuickAddTaskRequest(int ModuleId, string Name);
+
 public record CreateHolidayRequest(DateOnly HolidayDate, string Name, string Location, int? AccountId = null);
-public record UpdateHolidayRequest(DateOnly? HolidayDate, string? Name, string? Location, int? AccountId = null);
+/// <summary>AccountId null means "leave the client scope unchanged", like every
+/// other optional field here - so ClearAccountId is the explicit way to turn a
+/// client-specific holiday back into a company-wide one.</summary>
+public record UpdateHolidayRequest(DateOnly? HolidayDate, string? Name, string? Location, int? AccountId = null, bool ClearAccountId = false);
 public record HolidayDto(int HolidayId, DateOnly Date, string Name, string Location, int? AccountId);
+
+// ---- Project-wise resource allocation (admin reporting) ----
+
+public record ProjectResourceAllocationDto(int ProjectId, string ProjectCode, string ProjectName, int ResourceCount);
+public record AllocatedEmployeeDto(int EmployeeId, string EmployeeCode, string FullName, string DepartmentName);

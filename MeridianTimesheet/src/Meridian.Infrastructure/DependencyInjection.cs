@@ -11,8 +11,12 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        var connectionString = configuration.GetConnectionString("MeridianDatabase")
-            ?? throw new InvalidOperationException("Connection string 'MeridianDatabase' is not configured.");
+        // Empty in the git-tracked appsettings.json on purpose - fail at startup
+        // with a clear message rather than on the first database query.
+        var connectionString = configuration.GetConnectionString("MeridianDatabase");
+        if (string.IsNullOrWhiteSpace(connectionString))
+            throw new InvalidOperationException(
+                "Connection string 'MeridianDatabase' is not configured. See the README section \"Database connection string\".");
 
         services.AddDbContext<MeridianDbContext>(options => options.UseSqlServer(connectionString));
 
@@ -24,6 +28,8 @@ public static class DependencyInjection
         services.AddScoped<IDayTypeRequestRepository, DayTypeRequestRepository>();
         services.AddScoped<ILeaveRepository, LeaveRepository>();
 		services.AddScoped<INotificationRepository, NotificationRepository>();
+		services.AddScoped<IUserStoryRepository, UserStoryRepository>();
+		services.AddScoped<IEmployeeWeekOffRepository, EmployeeWeekOffRepository>();
 
 		return services;
     }

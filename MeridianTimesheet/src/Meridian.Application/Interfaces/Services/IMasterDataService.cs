@@ -11,18 +11,53 @@ public interface IMasterDataService
 	Task<IReadOnlyList<ModuleDto>> GetModulesAsync(int? projectId = null, CancellationToken ct = default);
 	Task<IReadOnlyList<WorkTaskDto>> GetTasksAsync(int? moduleId = null, CancellationToken ct = default);
 	Task<IReadOnlyList<HolidayDto>> GetHolidaysAsync(CancellationToken ct = default);
-	Task<IReadOnlyList<TaskCategoryDto>> GetTaskCategoriesAsync(CancellationToken ct = default);
+
+	// ---- Project Type + its Module/Task template tree ----
+	Task<IReadOnlyList<ProjectTypeDto>> GetProjectTypesAsync(CancellationToken ct = default);
+	/// <summary>Admin-only - the full Level-1/Level-2 template tree for every
+	/// Project Type at once, for the template-management screen.</summary>
+	Task<IReadOnlyList<ProjectTypeWithTemplateDto>> GetProjectTypesWithTemplatesAsync(CancellationToken ct = default);
+	Task<ProjectTypeWithTemplateDto> GetProjectTypeWithTemplateAsync(int projectTypeId, CancellationToken ct = default);
+	Task<ProjectTypeDto> CreateProjectTypeAsync(CreateProjectTypeRequest request, CancellationToken ct = default);
+	Task<ProjectTypeDto> UpdateProjectTypeAsync(int projectTypeId, UpdateProjectTypeRequest request, CancellationToken ct = default);
+	/// <summary>Fails with a clear error if the type is still in use and no
+	/// ReplacementProjectTypeId was supplied to reassign those Projects/Modules first.</summary>
+	Task DeleteProjectTypeAsync(int projectTypeId, DeleteProjectTypeRequest request, CancellationToken ct = default);
+
+	Task<ProjectTypeModuleTemplateDto> CreateModuleTemplateAsync(CreateProjectTypeModuleTemplateRequest request, CancellationToken ct = default);
+	Task<ProjectTypeModuleTemplateDto> UpdateModuleTemplateAsync(int moduleTemplateId, UpdateProjectTypeModuleTemplateRequest request, CancellationToken ct = default);
+	Task DeleteModuleTemplateAsync(int moduleTemplateId, CancellationToken ct = default);
+
+	Task<ProjectTypeTaskTemplateDto> CreateTaskTemplateAsync(CreateProjectTypeTaskTemplateRequest request, CancellationToken ct = default);
+	Task<ProjectTypeTaskTemplateDto> UpdateTaskTemplateAsync(int taskTemplateId, UpdateProjectTypeTaskTemplateRequest request, CancellationToken ct = default);
+	Task DeleteTaskTemplateAsync(int taskTemplateId, CancellationToken ct = default);
+
+	Task<DepartmentDto> CreateDepartmentAsync(SaveDepartmentRequest request, CancellationToken ct = default);
+	Task<DepartmentDto> UpdateDepartmentAsync(int departmentId, SaveDepartmentRequest request, CancellationToken ct = default);
 
 	Task<AccountDto> CreateAccountAsync(CreateAccountRequest request, CancellationToken ct = default);
 	Task<AccountDto> UpdateAccountAsync(int accountId, UpdateAccountRequest request, CancellationToken ct = default);
 
-	/// <summary>If InitialModuleTaskCategoryCode is supplied, also auto-creates a
-	/// starter "General" module under the new project pre-populated with that
-	/// category's standard task list — matching the original wireframe's
-	/// behavior of a new project being immediately usable. Pass null to skip
-	/// (an empty project with no modules yet).</summary>
+	/// <summary>If ProjectTypeId is supplied, auto-generates the full real
+	/// Module(L1)/Task(L2) tree from that type's template under the new
+	/// project - matching the original wireframe's behavior of a new project
+	/// being immediately usable. Pass null to skip (an empty project with no
+	/// modules yet).</summary>
 	Task<ProjectDto> CreateProjectAsync(CreateProjectRequest request, CancellationToken ct = default);
+	/// <summary>ProjectTypeId in the request is retroactive-classification-only -
+	/// applied ONLY when the project currently has none. The moment that
+	/// happens, its Modules/Tasks are auto-populated from the type's
+	/// template (merge-only - see SyncProjectModulesFromTemplateAsync). Once
+	/// a project has a ProjectTypeId, this can no longer change it.</summary>
 	Task<ProjectDto> UpdateProjectAsync(int projectId, UpdateProjectRequest request, CancellationToken ct = default);
+
+	/// <summary>Explicit re-sync for a project that already has a Project Type
+	/// set (the automatic sync in UpdateProjectAsync only fires the moment a
+	/// type is first assigned). Re-applies the same merge-only rule: adds
+	/// whichever of the type's template Modules/Tasks the project is still
+	/// missing, matched by name, never touching or removing anything that
+	/// already exists. Fails if the project has no Project Type yet.</summary>
+	Task<ProjectDto> SyncProjectModulesFromTemplateAsync(int projectId, CancellationToken ct = default);
 
 	Task<ModuleDto> CreateModuleAsync(CreateModuleRequest request, CancellationToken ct = default);
 	Task<ModuleDto> UpdateModuleAsync(int moduleId, UpdateModuleRequest request, CancellationToken ct = default);
@@ -30,7 +65,32 @@ public interface IMasterDataService
 	Task<WorkTaskDto> CreateTaskAsync(CreateTaskRequest request, CancellationToken ct = default);
 	Task<WorkTaskDto> UpdateTaskAsync(int taskId, UpdateTaskRequest request, CancellationToken ct = default);
 
+	// ---- Usage + delete (a Module/Task can only be deleted while no timesheet line uses it) ----
+	Task<MasterDataUsageDto> GetModuleUsageAsync(int moduleId, CancellationToken ct = default);
+	Task<MasterDataUsageDto> GetTaskUsageAsync(int taskId, CancellationToken ct = default);
+	/// <summary>Also deletes the module's own tasks. Fails if any timesheet line
+	/// uses the module (every line that uses one of its tasks uses the module too).</summary>
+	Task DeleteModuleAsync(int moduleId, CancellationToken ct = default);
+	Task DeleteTaskAsync(int taskId, CancellationToken ct = default);
+
+	/// <summary>Self-service "Others" quick-add from the timesheet entry screen -
+	/// lands in the "Pending Classification" internal account, flagged
+	/// NeedsReview, for an admin to properly classify later.</summary>
+	Task<ProjectDto> QuickAddProjectAsync(QuickAddProjectRequest request, CancellationToken ct = default);
+	Task<ModuleDto> QuickAddModuleAsync(QuickAddModuleRequest request, CancellationToken ct = default);
+	Task<WorkTaskDto> QuickAddTaskAsync(QuickAddTaskRequest request, CancellationToken ct = default);
+
 	Task<HolidayDto> CreateHolidayAsync(CreateHolidayRequest request, CancellationToken ct = default);
 	Task<HolidayDto> UpdateHolidayAsync(int holidayId, UpdateHolidayRequest request, CancellationToken ct = default);
 	Task DeleteHolidayAsync(int holidayId, CancellationToken ct = default);
+
+	// REMOVE (Nov 2026): only allowed when nothing uses the record - otherwise
+	// a BusinessRuleException says what still uses it.
+	Task DeleteDepartmentAsync(int departmentId, CancellationToken ct = default);
+	Task DeleteAccountAsync(int accountId, CancellationToken ct = default);
+	Task DeleteProjectAsync(int projectId, CancellationToken ct = default);
+
+	// ---- Project-wise resource allocation (admin reporting) ----
+	Task<IReadOnlyList<ProjectResourceAllocationDto>> GetProjectResourceAllocationsAsync(CancellationToken ct = default);
+	Task<IReadOnlyList<AllocatedEmployeeDto>> GetAllocatedEmployeesAsync(int projectId, CancellationToken ct = default);
 }

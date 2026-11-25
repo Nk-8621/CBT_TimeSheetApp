@@ -59,11 +59,8 @@ dotnet build
 
 ## Getting started
 
-1. **Check the connection string** in `src/Meridian.Api/appsettings.json`
-   — update the server name to match your actual SQL Server instance:
-   ```json
-   "MeridianDatabase": "Server=YOUR_SERVER;Database=Carbynetech_TimeSheet_Application;Trusted_Connection=True;TrustServerCertificate=True;"
-   ```
+1. **Set the connection string** — see "Database connection string" below
+   (it is no longer kept in `appsettings.json`).
 
 2. **Restore and build:**
    ```bash
@@ -88,6 +85,23 @@ dotnet build
    ```bash
    curl -H "X-Dev-Employee-Code: CBT1267" https://localhost:<port>/api/timesheet/CBT1267/2026-07-27
    ```
+
+## Database connection string
+
+The connection string is not kept in `appsettings.json` (that file has an
+empty placeholder). Supply it outside the repository:
+
+- **Deployed environment:** an `appsettings.Production.json` file next to
+  `appsettings.json` in the deployed folder (this file name is git-ignored).
+- **Developer machine:** from `src/Meridian.Api`, run
+  `dotnet user-secrets set "ConnectionStrings:MeridianDatabase" "<connection string>"`.
+
+The API stops at startup with a clear message if neither is set.
+
+## Allowed website addresses (CORS)
+
+Only the addresses listed under `Cors:AllowedOrigins` in `appsettings.json`
+can call the API from a browser. Add any new frontend address there.
 
 ## Switching on real Microsoft login
 

@@ -15,16 +15,19 @@ public class DayTypeRequestService(
 	IDayTypeRequestRepository dayTypeRequestRepository,
 	IWeekRecordRepository weekRecordRepository,
 	IMasterDataRepository masterDataRepository,
-	IEmployeeService employeeService) : IDayTypeRequestService
+	IEmployeeService employeeService,
+	IDayTypeResolutionService dayTypeResolutionService) : IDayTypeRequestService
 {
 	public async Task<DayTypeRequestDto> SubmitAsync(string employeeCode, DateOnly date, string requestType, string? note, CancellationToken ct = default)
 	{
 		var employee = await RequireEmployeeAsync(employeeCode, ct);
 
 		if (!Enum.TryParse<DayTypeRequestType>(requestType, out var type))
-			throw new BusinessRuleException("Request type must be one of WFH, LeaveFirstHalf, LeaveSecondHalf or LeaveFull.");
+			throw new BusinessRuleException("Request type must be one of WFH, LeaveFirstHalf, LeaveSecondHalf, LeaveFull, OnDuty, CompOffFirstHalf, CompOffSecondHalf, CompOffFull, UnpaidFirstHalf, UnpaidSecondHalf or UnpaidFull.");
 		if (string.IsNullOrWhiteSpace(note))
 			throw new BusinessRuleException("A note is required for this request.");
+		if (note.Length > 500) // Carbynetech_DayTypeRequest.Note is NVARCHAR(500)
+			throw new BusinessRuleException("Please keep the note to 500 characters or fewer.");
 		// Past dates are allowed up to a month back (e.g. catching up on a
 		// WFH/Leave day that was missed at the time), but no further - there's
 		// no upper bound on how far into the future one can be requested.
@@ -37,8 +40,11 @@ public class DayTypeRequestService(
 		var holiday = await masterDataRepository.GetHolidayOnAsync(date, employee.PrimaryAccountId, ct);
 		if (holiday is not null)
 			throw new BusinessRuleException($"{date:d MMM} is already a holiday ({holiday.Name}) - nothing to request.");
-		if (WeekMath.IsWeekend(date))
-			throw new BusinessRuleException($"{date:d MMM} is a weekly off day - nothing to request.");
+		// WEEK OFFS (Nov 2026): the employee's own week-off days, not just Sat/Sun.
+		var requestWeekStart = WeekMath.MondayOf(date);
+		var requestDay = (await dayTypeResolutionService.ResolveWeekAsync(employee.EmployeeId, requestWeekStart, ct))[date.DayNumber - requestWeekStart.DayNumber];
+		if (requestDay.DayType == nameof(DayType.O))
+			throw new BusinessRuleException($"{date:d MMM} is a W-OFF day - nothing to request.");
 
 		var existing = await dayTypeRequestRepository.GetActiveForDateAsync(employee.EmployeeId, date, ct);
 		if (existing is not null)
@@ -71,8 +77,8 @@ public class DayTypeRequestService(
 
 		if (type is DayTypeRequestType.WFH)
 			await dayTypeRepository.SetAsync(employee.EmployeeId, date, DayType.WFH, ct);
-		// LeaveFirstHalf/LeaveSecondHalf/LeaveFull need no separate write - DayTypeResolutionService
-		// picks up any Pending-or-Approved leave request directly.
+		// Leave*, OnDuty, CompOff* and Unpaid* requests need no separate write -
+		// DayTypeResolutionService picks up any Pending-or-Approved leave, on duty or comp-off request directly.
 
 		await dayTypeRequestRepository.SaveChangesAsync(ct);
 		await dayTypeRepository.SaveChangesAsync(ct);
@@ -105,6 +111,8 @@ public class DayTypeRequestService(
 		var request = await RequireRequestAsync(dayTypeRequestId, ct);
 		if (request.Status is not DayTypeRequestStatus.Pending)
 			throw new BusinessRuleException("This request has already been decided.");
+		if (comment is { Length: > 500 }) // Carbynetech_DayTypeRequest.DecisionComment is NVARCHAR(500)
+			throw new BusinessRuleException("Please keep the comment to 500 characters or fewer.");
 
 		var employee = await RequireEmployeeByIdAsync(request.EmployeeId, ct);
 		await EnsureIsManagerAsync(employee.EmployeeCode, approverEmployeeCode, ct);
@@ -156,9 +164,11 @@ public class DayTypeRequestService(
 
 	private static decimal CapacityFor(DayTypeRequestType type) => type switch
 	{
-		DayTypeRequestType.WFH => WeekMath.StandardHoursPerDay,
-		DayTypeRequestType.LeaveFirstHalf or DayTypeRequestType.LeaveSecondHalf => WeekMath.StandardHoursPerDay / 2,
-		DayTypeRequestType.LeaveFull => 0m,
+		DayTypeRequestType.WFH or DayTypeRequestType.OnDuty => WeekMath.StandardHoursPerDay,
+		DayTypeRequestType.LeaveFirstHalf or DayTypeRequestType.LeaveSecondHalf
+			or DayTypeRequestType.CompOffFirstHalf or DayTypeRequestType.CompOffSecondHalf
+			or DayTypeRequestType.UnpaidFirstHalf or DayTypeRequestType.UnpaidSecondHalf => WeekMath.StandardHoursPerDay / 2,
+		DayTypeRequestType.LeaveFull or DayTypeRequestType.CompOffFull or DayTypeRequestType.UnpaidFull => 0m,
 		_ => 0m,
 	};
 

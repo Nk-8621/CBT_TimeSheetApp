@@ -25,5 +25,9 @@ public interface IReportsService
 		DateOnly weekTo,
 		int? departmentId,
 		string approvalStatus,
-		CancellationToken ct = default);
+		CancellationToken ct = default,
+		// DATE RANGE (Nov 2026): optional exact dates. When given, only the days
+		// between them are counted. To revert: remove these two parameters.
+		DateOnly? fromDate = null,
+		DateOnly? toDate = null);
 }

@@ -35,17 +35,36 @@ public class TimesheetController(ITimesheetService timesheetService, ICurrentUse
 		return CreatedAtAction(nameof(GetWeek), new { employeeCode, weekStart = weekStart.ToString("yyyy-MM-dd") }, created);
 	}
 
+	[HttpPost("{employeeCode}/{weekStart}/story-tasks")]
+	public async Task<IActionResult> AddStoryTask(string employeeCode, DateOnly weekStart, [FromBody] CreateStoryTaskRequest request, CancellationToken ct)
+	{
+		if (EnsureSelfOrAdmin(employeeCode) is IActionResult denied) return denied;
+		var created = await timesheetService.AddStoryTaskAsync(employeeCode, weekStart, request, ct);
+		return CreatedAtAction(nameof(GetWeek), new { employeeCode, weekStart = weekStart.ToString("yyyy-MM-dd") }, created);
+	}
+
 	[HttpPut("entries/{timeEntryId:int}")]
 	public async Task<IActionResult> UpdateEntry(int timeEntryId, [FromBody] UpdateTimeEntryRequest request, CancellationToken ct)
 	{
+		if (await EnsureEntryOwnerOrAdminAsync(timeEntryId, ct) is IActionResult denied) return denied;
 		return Ok(await timesheetService.UpdateEntryAsync(timeEntryId, request, ct));
 	}
 
 	[HttpDelete("entries/{timeEntryId:int}")]
 	public async Task<IActionResult> RemoveEntry(int timeEntryId, CancellationToken ct)
 	{
+		if (await EnsureEntryOwnerOrAdminAsync(timeEntryId, ct) is IActionResult denied) return denied;
 		await timesheetService.RemoveEntryAsync(timeEntryId, ct);
 		return NoContent();
+	}
+
+	/// <summary>These two routes carry only the entry id, not an employeeCode,
+	/// so the usual EnsureSelfOrAdmin check needs the entry's owner looked up
+	/// first. An unknown id falls through to the service, which returns 404.</summary>
+	private async Task<IActionResult?> EnsureEntryOwnerOrAdminAsync(int timeEntryId, CancellationToken ct)
+	{
+		var ownerCode = await timesheetService.GetEntryOwnerCodeAsync(timeEntryId, ct);
+		return ownerCode is null ? null : EnsureSelfOrAdmin(ownerCode);
 	}
 
 	[HttpPut("{employeeCode}/day-type/{date}")]

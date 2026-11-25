@@ -19,6 +19,21 @@ public class ReportsService(
 		["ok"] = [WeekStatus.Approved],
 	};
 
+	/// <summary>DATE RANGE (Nov 2026): sum of a week line's hours on the days
+	/// between fromDate and toDate (either may be null = open-ended).</summary>
+	private static decimal HoursWithinDates(decimal[] hoursByDay, DateOnly weekStart, DateOnly? fromDate, DateOnly? toDate)
+	{
+		decimal total = 0;
+		for (var i = 0; i < hoursByDay.Length; i++)
+		{
+			var day = weekStart.AddDays(i);
+			if (fromDate is DateOnly from && day < from) continue;
+			if (toDate is DateOnly to && day > to) continue;
+			total += hoursByDay[i];
+		}
+		return total;
+	}
+
 	private record Contribution(int DeptId, int AccountId, int ProjectId, int ModuleId, int TaskId, int EmployeeId, string Classification, decimal Hours);
 
 	public async Task<IReadOnlyList<ProjectHoursReportRowDto>> GetProjectHoursAsync(
@@ -33,10 +48,12 @@ public class ReportsService(
 		var nonBillable = new Dictionary<int, decimal>();
 		var employeesByProject = new Dictionary<int, HashSet<int>>();
 
-		foreach (var employeeId in employeeIds)
+		// One query for everyone's lines this week, instead of one per employee.
+		var weekEntries = await timeEntryRepository.GetForEmployeesAsync(employeeIds, weekStart, weekStart, ct);
+		foreach (var employeeEntries in weekEntries.GroupBy(e => e.EmployeeId))
 		{
-			var entries = await timeEntryRepository.GetForWeekAsync(employeeId, weekStart, ct);
-			foreach (var entry in entries)
+			var employeeId = employeeEntries.Key;
+			foreach (var entry in employeeEntries)
 			{
 				var hours = entry.TotalHours;
 				if (hours == 0) continue;
@@ -71,7 +88,8 @@ public class ReportsService(
 	}
 
 	public async Task<ReportsSummaryDto> GetSummaryAsync(
-		IReadOnlyList<int> employeeIds, DateOnly weekFrom, DateOnly weekTo, int? departmentId, string approvalStatus, CancellationToken ct = default)
+		IReadOnlyList<int> employeeIds, DateOnly weekFrom, DateOnly weekTo, int? departmentId, string approvalStatus, CancellationToken ct = default,
+		DateOnly? fromDate = null, DateOnly? toDate = null)
 	{
 		var statusSet = StatusSets.TryGetValue(approvalStatus, out var s) ? s : StatusSets["all"];
 
@@ -86,19 +104,31 @@ public class ReportsService(
 		for (var w = weekFrom; w <= weekTo; w = w.AddDays(7))
 			weeksInRange.Add(w);
 
+		// Everything for the whole range in two queries (lines + week statuses),
+		// instead of two queries per employee per week.
+		var rangeEntries = await timeEntryRepository.GetForEmployeesAsync(employeeIds, weekFrom, weekTo, ct);
+		var entriesByEmployeeWeek = rangeEntries.ToLookup(e => (e.EmployeeId, e.WeekStartDate));
+		var rangeWeekRecords = await weekRecordRepository.GetForEmployeesAsync(employeeIds, weekFrom, weekTo, ct);
+		var statusByEmployeeWeek = rangeWeekRecords.ToDictionary(w => (w.EmployeeId, w.WeekStartDate), w => w.Status);
+
 		var contributions = new List<Contribution>();
 		foreach (var employeeId in employeeIds)
 		{
 			foreach (var week in weeksInRange)
 			{
-				var weekRecord = await weekRecordRepository.GetAsync(employeeId, week, ct);
-				var status = weekRecord?.Status ?? WeekStatus.Draft;
+				// No week record yet means the week was never submitted - a Draft.
+				var status = statusByEmployeeWeek.TryGetValue((employeeId, week), out var recordedStatus) ? recordedStatus : WeekStatus.Draft;
 				if (!statusSet.Contains(status)) continue;
 
-				var entries = await timeEntryRepository.GetForWeekAsync(employeeId, week, ct);
+				var entries = entriesByEmployeeWeek[(employeeId, week)];
 				foreach (var entry in entries)
 				{
-					var hours = entry.TotalHours;
+					// DATE RANGE (Nov 2026): with exact dates, count only the days of this
+					// week that fall between them (e.g. from a Wednesday = Wed..Sun).
+					// To revert: go back to just "var hours = entry.TotalHours;".
+					var hours = fromDate is null && toDate is null
+						? entry.TotalHours
+						: HoursWithinDates(entry.HoursByDay, week, fromDate, toDate);
 					if (hours == 0) continue;
 					if (!projectById.TryGetValue(entry.ProjectId, out var project)) continue;
 					if (!accountById.TryGetValue(project.AccountId, out var account)) continue;
@@ -112,7 +142,16 @@ public class ReportsService(
 			}
 		}
 
-		List<ReportRollupRowDto> BuildRollup(IEnumerable<IGrouping<int, Contribution>> groups, Func<int, (string Label, string Sub)> labelOf)
+		// How an employee is labelled - used by the Resource-wise list and by
+		// the employee rows shown when a Department / Customer / Project row is expanded.
+		(string Label, string Sub) ResourceLabel(int id)
+		{
+			if (!employeeById.TryGetValue(id, out var e)) return ("—", "—");
+			var deptName = deptById.TryGetValue(e.DepartmentId, out var d) ? d.Name : "—";
+			return (e.FullName, $"{e.Designation} · {deptName}");
+		}
+
+		List<ReportRollupRowDto> BuildRollup(IEnumerable<IGrouping<int, Contribution>> groups, Func<int, (string Label, string Sub)> labelOf, bool includeResources = false)
 		{
 			return groups
 				.Select(g =>
@@ -123,35 +162,33 @@ public class ReportsService(
 					var nonBillable = g.Where(x => x.Classification == "NonBillable").Sum(x => x.Hours);
 					var total = g.Sum(x => x.Hours);
 					var resources = g.Select(x => x.EmployeeId).Distinct().Count();
-					return new ReportRollupRowDto(label, sub, total, billable, partialBillable, nonBillable, resources);
+					var resourceRows = includeResources
+						? BuildRollup(g.GroupBy(x => x.EmployeeId), ResourceLabel)
+						: null;
+					return new ReportRollupRowDto(label, sub, total, billable, partialBillable, nonBillable, resources, resourceRows);
 				})
 				.OrderByDescending(r => r.TotalHours)
 				.ToList();
 		}
 
 		var deptWise = BuildRollup(contributions.GroupBy(c => c.DeptId), id =>
-			deptById.TryGetValue(id, out var d) ? (d.Name, d.Code) : ("—", "—"));
+			deptById.TryGetValue(id, out var d) ? (d.Name, d.Code) : ("—", "—"), includeResources: true);
 
 		var accWise = BuildRollup(contributions.GroupBy(c => c.AccountId), id =>
 		{
 			if (!accountById.TryGetValue(id, out var a)) return ("—", "—");
 			var deptName = deptById.TryGetValue(a.DepartmentId, out var d) ? d.Name : "—";
 			return (a.Name, $"{a.AccountType} · {deptName}");
-		});
+		}, includeResources: true);
 
 		var projWise = BuildRollup(contributions.GroupBy(c => c.ProjectId), id =>
 		{
 			if (!projectById.TryGetValue(id, out var p)) return ("—", "—");
 			var accName = accountById.TryGetValue(p.AccountId, out var a) ? a.Name : "—";
 			return (p.Name, $"{p.Code} · {accName}");
-		});
+		}, includeResources: true);
 
-		var resWise = BuildRollup(contributions.GroupBy(c => c.EmployeeId), id =>
-		{
-			if (!employeeById.TryGetValue(id, out var e)) return ("—", "—");
-			var deptName = deptById.TryGetValue(e.DepartmentId, out var d) ? d.Name : "—";
-			return (e.FullName, $"{e.Designation} · {deptName}");
-		});
+		var resWise = BuildRollup(contributions.GroupBy(c => c.EmployeeId), ResourceLabel);
 
 		var taskWise = BuildRollup(contributions.GroupBy(c => c.TaskId), id =>
 		{
@@ -174,4 +211,4 @@ public class ReportsService(
 			deptWise, accWise, projWise, resWise, taskWise
 		);
 	}
-}
+}

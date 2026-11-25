@@ -16,17 +16,22 @@ public class MasterDataRepository(MeridianDbContext db) : IMasterDataRepository
 	public async Task<IReadOnlyList<Account>> GetAccountsAsync(CancellationToken ct = default) =>
 		await db.Accounts.AsNoTracking().ToListAsync(ct);
 
-	// Returns ALL projects, active or not — the Master Data admin screen needs
+	// Returns ALL projects, active or not - the Master Data admin screen needs
 	// to see inactive projects too (otherwise deactivating one is a one-way
 	// trip with no way to ever see or reactivate it again). Screens that log
 	// NEW time (e.g. the Add Task Line dropdown) filter to active-only
 	// client-side instead.
 	public async Task<IReadOnlyList<Project>> GetProjectsAsync(CancellationToken ct = default) =>
-		await db.Projects.AsNoTracking().ToListAsync(ct);
+		await db.Projects.AsNoTracking()
+			.Include(p => p.ProjectType)
+			.Include(p => p.ProjectLeadEmployee)
+			.Include(p => p.ProjectManagerEmployee)
+			.Include(p => p.DeliveryHeadEmployee)
+			.ToListAsync(ct);
 
 	public async Task<IReadOnlyList<Module>> GetModulesAsync(int? projectId = null, CancellationToken ct = default)
 	{
-		var query = db.Modules.AsNoTracking().Include(m => m.TaskCategory).AsQueryable();
+		var query = db.Modules.AsNoTracking().Include(m => m.ProjectType).AsQueryable();
 		if (projectId is int p) query = query.Where(m => m.ProjectId == p);
 		return await query.ToListAsync(ct);
 	}
@@ -47,20 +52,63 @@ public class MasterDataRepository(MeridianDbContext db) : IMasterDataRepository
 	}
 
 	public Task<Holiday?> GetHolidayOnAsync(DateOnly date, int? accountId, CancellationToken ct = default) =>
-	db.Holidays.FirstOrDefaultAsync(h => h.HolidayDate == date && (h.AccountId == null || h.AccountId == accountId), ct);
+		db.Holidays.FirstOrDefaultAsync(h => h.HolidayDate == date && (h.AccountId == null || h.AccountId == accountId), ct);
 
-	public async Task<IReadOnlyList<TaskCategory>> GetTaskCategoriesAsync(CancellationToken ct = default) =>
-		await db.TaskCategories.AsNoTracking().ToListAsync(ct);
+	public async Task<IReadOnlyList<ProjectType>> GetProjectTypesAsync(CancellationToken ct = default) =>
+		await db.ProjectTypes.AsNoTracking().ToListAsync(ct);
 
-	// ---- Get by ID (tracked — the service mutates these directly for updates) ----
+	public async Task<IReadOnlyList<ProjectType>> GetProjectTypesWithTemplatesAsync(CancellationToken ct = default) =>
+		await db.ProjectTypes.AsNoTracking()
+			.Include(t => t.ModuleTemplates.OrderBy(m => m.SortOrder))
+				.ThenInclude(m => m.TaskTemplates.OrderBy(x => x.SortOrder))
+			.AsSplitQuery()
+			.ToListAsync(ct);
+
+	public Task<ProjectType?> GetProjectTypeByIdAsync(int projectTypeId, CancellationToken ct = default) =>
+		db.ProjectTypes.FirstOrDefaultAsync(t => t.ProjectTypeId == projectTypeId, ct);
+
+	public Task<ProjectType?> GetProjectTypeByCodeAsync(string code, CancellationToken ct = default) =>
+		db.ProjectTypes.FirstOrDefaultAsync(t => t.Code == code, ct);
+
+	public Task<ProjectType?> GetProjectTypeWithTemplatesByIdAsync(int projectTypeId, CancellationToken ct = default) =>
+		db.ProjectTypes
+			.Include(t => t.ModuleTemplates.OrderBy(m => m.SortOrder))
+				.ThenInclude(m => m.TaskTemplates.OrderBy(x => x.SortOrder))
+			.AsSplitQuery()
+			.FirstOrDefaultAsync(t => t.ProjectTypeId == projectTypeId, ct);
+
+	public Task<ProjectTypeModuleTemplate?> GetModuleTemplateByIdAsync(int moduleTemplateId, CancellationToken ct = default) =>
+		db.ProjectTypeModuleTemplates.FirstOrDefaultAsync(m => m.ProjectTypeModuleTemplateId == moduleTemplateId, ct);
+
+	public Task<ProjectTypeTaskTemplate?> GetTaskTemplateByIdAsync(int taskTemplateId, CancellationToken ct = default) =>
+		db.ProjectTypeTaskTemplates.FirstOrDefaultAsync(t => t.ProjectTypeTaskTemplateId == taskTemplateId, ct);
+
+	public async Task<IReadOnlyList<Project>> GetProjectsByProjectTypeIdAsync(int projectTypeId, CancellationToken ct = default) =>
+		await db.Projects.Where(p => p.ProjectTypeId == projectTypeId).ToListAsync(ct);
+
+	public async Task<IReadOnlyList<Module>> GetModulesByProjectTypeIdAsync(int projectTypeId, CancellationToken ct = default) =>
+		await db.Modules.Where(m => m.ProjectTypeId == projectTypeId).ToListAsync(ct);
+
+	// ---- Get by ID (tracked - the service mutates these directly for updates) ----
+	public Task<Department?> GetDepartmentByIdAsync(int departmentId, CancellationToken ct = default) =>
+		db.Departments.FirstOrDefaultAsync(d => d.DepartmentId == departmentId, ct);
+
 	public Task<Account?> GetAccountByIdAsync(int accountId, CancellationToken ct = default) =>
 		db.Accounts.FirstOrDefaultAsync(a => a.AccountId == accountId, ct);
 
+	public Task<Account?> GetAccountByNameAsync(string name, CancellationToken ct = default) =>
+		db.Accounts.FirstOrDefaultAsync(a => a.Name == name, ct);
+
 	public Task<Project?> GetProjectByIdAsync(int projectId, CancellationToken ct = default) =>
-		db.Projects.FirstOrDefaultAsync(p => p.ProjectId == projectId, ct);
+		db.Projects
+			.Include(p => p.ProjectType)
+			.Include(p => p.ProjectLeadEmployee)
+			.Include(p => p.ProjectManagerEmployee)
+			.Include(p => p.DeliveryHeadEmployee)
+			.FirstOrDefaultAsync(p => p.ProjectId == projectId, ct);
 
 	public Task<Module?> GetModuleByIdAsync(int moduleId, CancellationToken ct = default) =>
-		db.Modules.FirstOrDefaultAsync(m => m.ModuleId == moduleId, ct);
+		db.Modules.Include(m => m.ProjectType).FirstOrDefaultAsync(m => m.ModuleId == moduleId, ct);
 
 	public Task<WorkTask?> GetTaskByIdAsync(int taskId, CancellationToken ct = default) =>
 		db.Tasks.FirstOrDefaultAsync(t => t.TaskId == taskId, ct);
@@ -68,10 +116,10 @@ public class MasterDataRepository(MeridianDbContext db) : IMasterDataRepository
 	public Task<Holiday?> GetHolidayByIdAsync(int holidayId, CancellationToken ct = default) =>
 		db.Holidays.FirstOrDefaultAsync(h => h.HolidayId == holidayId, ct);
 
-	public Task<TaskCategory?> GetTaskCategoryByCodeAsync(string code, CancellationToken ct = default) =>
-		db.TaskCategories.FirstOrDefaultAsync(c => c.Code == code, ct);
-
 	// ---- Mutations ----
+	public async Task AddDepartmentAsync(Department department, CancellationToken ct = default) =>
+		await db.Departments.AddAsync(department, ct);
+
 	public async Task AddAccountAsync(Account account, CancellationToken ct = default) =>
 		await db.Accounts.AddAsync(account, ct);
 
@@ -88,6 +136,77 @@ public class MasterDataRepository(MeridianDbContext db) : IMasterDataRepository
 		await db.Holidays.AddAsync(holiday, ct);
 
 	public void RemoveHoliday(Holiday holiday) => db.Holidays.Remove(holiday);
+
+	// ---- REMOVE (Nov 2026): what still uses a department / client / project ----
+	public Task<int> CountEmployeesInDepartmentAsync(int departmentId, CancellationToken ct = default) =>
+		db.Employees.CountAsync(e => e.DepartmentId == departmentId
+			|| db.EmployeeDepartments.Any(ed => ed.EmployeeId == e.EmployeeId && ed.DepartmentId == departmentId), ct);
+
+	public Task<int> CountAccountsInDepartmentAsync(int departmentId, CancellationToken ct = default) =>
+		db.Accounts.CountAsync(a => a.DepartmentId == departmentId, ct);
+
+	public Task<int> CountChildDepartmentsAsync(int departmentId, CancellationToken ct = default) =>
+		db.Departments.CountAsync(d => d.ParentDepartmentId == departmentId, ct);
+
+	public Task<int> CountProjectsForAccountAsync(int accountId, CancellationToken ct = default) =>
+		db.Projects.CountAsync(p => p.AccountId == accountId, ct);
+
+	public Task<int> CountEmployeesWithPrimaryAccountAsync(int accountId, CancellationToken ct = default) =>
+		db.Employees.CountAsync(e => e.PrimaryAccountId == accountId, ct);
+
+	public Task<int> CountHolidaysForAccountAsync(int accountId, CancellationToken ct = default) =>
+		db.Holidays.CountAsync(h => h.AccountId == accountId, ct);
+
+	public async Task<int> CountWeekOffsForAccountAsync(int accountId, CancellationToken ct = default) =>
+		await db.ClientWeekOffs.CountAsync(w => w.AccountId == accountId, ct)
+		+ await db.EmployeeWeekOffs.CountAsync(w => w.AccountId == accountId, ct);
+
+	public Task<int> CountTimeEntriesForProjectAsync(int projectId, CancellationToken ct = default) =>
+		db.TimeEntries.CountAsync(t => t.ProjectId == projectId, ct);
+
+	public Task<int> CountUserStoriesForProjectAsync(int projectId, CancellationToken ct = default) =>
+		db.UserStories.CountAsync(s => s.ProjectId == projectId, ct);
+
+	public Task<int> CountAllocationsForProjectAsync(int projectId, CancellationToken ct = default) =>
+		db.EmployeeProjectAllocations.CountAsync(a => a.ProjectId == projectId, ct);
+
+	public void RemoveDepartment(Department department) => db.Departments.Remove(department);
+
+	public void RemoveAccount(Account account) => db.Accounts.Remove(account);
+
+	public void RemoveProject(Project project) => db.Projects.Remove(project);
+
+	public void RemoveModule(Module module) => db.Modules.Remove(module);
+
+	public void RemoveTask(WorkTask task) => db.Tasks.Remove(task);
+
+	public async Task AddProjectTypeAsync(ProjectType projectType, CancellationToken ct = default) =>
+		await db.ProjectTypes.AddAsync(projectType, ct);
+
+	public void RemoveProjectType(ProjectType projectType) => db.ProjectTypes.Remove(projectType);
+
+	public async Task AddModuleTemplateAsync(ProjectTypeModuleTemplate template, CancellationToken ct = default) =>
+		await db.ProjectTypeModuleTemplates.AddAsync(template, ct);
+
+	public void RemoveModuleTemplate(ProjectTypeModuleTemplate template) => db.ProjectTypeModuleTemplates.Remove(template);
+
+	public async Task AddTaskTemplateAsync(ProjectTypeTaskTemplate template, CancellationToken ct = default) =>
+		await db.ProjectTypeTaskTemplates.AddAsync(template, ct);
+
+	public void RemoveTaskTemplate(ProjectTypeTaskTemplate template) => db.ProjectTypeTaskTemplates.Remove(template);
+
+	// ---- Project-wise resource allocation ----
+
+	public async Task<IReadOnlyList<Project>> GetProjectsWithAllocationsAsync(CancellationToken ct = default) =>
+		await db.Projects.AsNoTracking()
+			.Include(p => p.EmployeeAllocations)
+			.ToListAsync(ct);
+
+	public Task<Project?> GetProjectWithAllocationsByIdAsync(int projectId, CancellationToken ct = default) =>
+		db.Projects.AsNoTracking()
+			.Include(p => p.EmployeeAllocations).ThenInclude(a => a.Employee).ThenInclude(e => e!.Department)
+			.AsSplitQuery()
+			.FirstOrDefaultAsync(p => p.ProjectId == projectId, ct);
 
 	public Task SaveChangesAsync(CancellationToken ct = default) => db.SaveChangesAsync(ct);
 }

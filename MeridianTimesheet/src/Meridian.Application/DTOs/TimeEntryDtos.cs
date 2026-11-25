@@ -10,7 +10,11 @@ public record TimeEntryDto(
     string Classification,
     string? BillingCategory,
     string? Note,
-    decimal[] HoursByDay // Monday..Sunday
+    decimal[] HoursByDay, // Monday..Sunday
+    int? UserStoryId = null,      // set when this line is a task under a user story
+    string? UserStoryName = null,
+    DateOnly? UserStoryStartDate = null, // the story's dates - the grid locks days outside them
+    DateOnly? UserStoryEndDate = null
 );
 
 public record CreateTimeEntryRequest(
@@ -30,7 +34,8 @@ public record UpdateTimeEntryRequest(
     string? Classification,
     string? BillingCategory,
     string? Note,
-    decimal[]? HoursByDay
+    decimal[]? HoursByDay,
+    int? UserStoryId = null // move a story task to another of the employee's user stories
 );
 
 public record DayTypeDto(DateOnly Date, string DayType, decimal CapacityHours,
@@ -38,6 +43,10 @@ public record DayTypeDto(DateOnly Date, string DayType, decimal CapacityHours,
 	// ("LeaveFirstHalf" / "LeaveSecondHalf") drove the resolution, so callers
 	// like Team Compliance can render the correct half of the day box. Null
 	// for every other day type.
-	string? RequestType = null);
+	string? RequestType = null,
+	// DAY STATUS (Nov 2026): true when the employee can switch this day
+	// between Working / Leave / WFH on My Timesheet. False on W-OFF,
+	// holidays, KEKA leave and days with a leave/On Duty request.
+	bool CanChange = false);
 
 public record SetDayTypeRequest(string DayType);

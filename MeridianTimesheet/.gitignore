@@ -2,3 +2,6 @@ bin/
 obj/
 *.user
 .vs/
+
+# Environment-specific settings - kept only on the machine that uses them.
+appsettings.Production.json

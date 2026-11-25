@@ -96,3 +96,27 @@ public class EmployeeDepartmentConfiguration : IEntityTypeConfiguration<Employee
             .OnDelete(DeleteBehavior.Restrict);
     }
 }
+
+/// <summary>Which Projects an Employee is actually allocated to right now -
+/// one row per Employee/Project pair, ticked/unticked from the Add/Edit
+/// Employee form. Drives the admin-facing project-wise resource count.</summary>
+public class EmployeeProjectAllocationConfiguration : IEntityTypeConfiguration<EmployeeProjectAllocation>
+{
+    public void Configure(EntityTypeBuilder<EmployeeProjectAllocation> builder)
+    {
+        builder.ToTable("Carbynetech_EmployeeProjectAllocation");
+        builder.HasKey(ea => new { ea.EmployeeId, ea.ProjectId });
+        builder.Property(ea => ea.Classification).HasMaxLength(20).IsRequired();
+        builder.Property(ea => ea.BillingCategory).HasMaxLength(10);
+
+        builder.HasOne(ea => ea.Employee)
+            .WithMany(e => e.ProjectAllocations)
+            .HasForeignKey(ea => ea.EmployeeId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasOne(ea => ea.Project)
+            .WithMany(p => p.EmployeeAllocations)
+            .HasForeignKey(ea => ea.ProjectId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}

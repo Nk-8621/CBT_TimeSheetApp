@@ -12,12 +12,14 @@ public class TimeEntryRepository(MeridianDbContext db) : ITimeEntryRepository
 			.Include(t => t.Project)
 			.Include(t => t.Module)
 			.Include(t => t.Task)
+			.Include(t => t.UserStory)
 			.Where(t => t.EmployeeId == employeeId && t.WeekStartDate == weekStartDate)
 			.ToListAsync(ct);
 
 	public Task<TimeEntry?> GetByIdAsync(int timeEntryId, CancellationToken ct = default) =>
 		db.TimeEntries
 			.Include(t => t.Task)
+			.Include(t => t.UserStory)
 			.FirstOrDefaultAsync(t => t.TimeEntryId == timeEntryId, ct);
 
 	public async Task AddAsync(TimeEntry entry, CancellationToken ct = default) =>
@@ -44,4 +46,15 @@ public class TimeEntryRepository(MeridianDbContext db) : ITimeEntryRepository
 
 		return raw.Select(r => new WeeklyHoursAggregate(r.WeekStartDate, r.Total, r.Billable, r.PartialBillable)).ToList();
 	}
+
+	public Task<int> CountForModuleAsync(int moduleId, CancellationToken ct = default) =>
+		db.TimeEntries.CountAsync(t => t.ModuleId == moduleId, ct);
+
+	public Task<int> CountForTaskAsync(int taskId, CancellationToken ct = default) =>
+		db.TimeEntries.CountAsync(t => t.TaskId == taskId, ct);
+
+	public async Task<IReadOnlyList<TimeEntry>> GetForEmployeesAsync(IReadOnlyList<int> employeeIds, DateOnly fromWeek, DateOnly toWeek, CancellationToken ct = default) =>
+		await db.TimeEntries.AsNoTracking()
+			.Where(t => employeeIds.Contains(t.EmployeeId) && t.WeekStartDate >= fromWeek && t.WeekStartDate <= toWeek)
+			.ToListAsync(ct);
 }

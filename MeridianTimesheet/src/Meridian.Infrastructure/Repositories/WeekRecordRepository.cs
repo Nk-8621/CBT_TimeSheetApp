@@ -44,5 +44,10 @@ public class WeekRecordRepository(MeridianDbContext db) : IWeekRecordRepository
 			.OrderByDescending(w => w.WeekStartDate)
 			.ToListAsync(ct);
 
+	public async Task<IReadOnlyList<WeekRecord>> GetForEmployeesAsync(IReadOnlyList<int> employeeIds, DateOnly fromWeek, DateOnly toWeek, CancellationToken ct = default) =>
+		await db.WeekRecords.AsNoTracking()
+			.Where(w => employeeIds.Contains(w.EmployeeId) && w.WeekStartDate >= fromWeek && w.WeekStartDate <= toWeek)
+			.ToListAsync(ct);
+
 	public Task SaveChangesAsync(CancellationToken ct = default) => db.SaveChangesAsync(ct);
 }

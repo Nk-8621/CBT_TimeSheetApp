@@ -17,7 +17,9 @@ public class MeridianDbContext(DbContextOptions<MeridianDbContext> options) : Db
     public DbSet<Location> Locations => Set<Location>();
     public DbSet<Account> Accounts => Set<Account>();
     public DbSet<Project> Projects => Set<Project>();
-    public DbSet<TaskCategory> TaskCategories => Set<TaskCategory>();
+    public DbSet<ProjectType> ProjectTypes => Set<ProjectType>();
+    public DbSet<ProjectTypeModuleTemplate> ProjectTypeModuleTemplates => Set<ProjectTypeModuleTemplate>();
+    public DbSet<ProjectTypeTaskTemplate> ProjectTypeTaskTemplates => Set<ProjectTypeTaskTemplate>();
     public DbSet<Module> Modules => Set<Module>();
     public DbSet<WorkTask> Tasks => Set<WorkTask>();
 
@@ -25,19 +27,21 @@ public class MeridianDbContext(DbContextOptions<MeridianDbContext> options) : Db
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<EmployeeRole> EmployeeRoles => Set<EmployeeRole>();
     public DbSet<EmployeeDepartment> EmployeeDepartments => Set<EmployeeDepartment>();
+    public DbSet<EmployeeProjectAllocation> EmployeeProjectAllocations => Set<EmployeeProjectAllocation>();
 
     public DbSet<Holiday> Holidays => Set<Holiday>();
     public DbSet<LeaveRecord> LeaveRecords => Set<LeaveRecord>();
 
     public DbSet<TimeEntry> TimeEntries => Set<TimeEntry>();
+    public DbSet<UserStory> UserStories => Set<UserStory>();
     public DbSet<DayTypeOverride> DayTypeOverrides => Set<DayTypeOverride>();
     public DbSet<DayTypeRequest> DayTypeRequests => Set<DayTypeRequest>();
+    public DbSet<ClientWeekOff> ClientWeekOffs => Set<ClientWeekOff>();
+    public DbSet<EmployeeWeekOff> EmployeeWeekOffs => Set<EmployeeWeekOff>();
     public DbSet<WeekRecord> WeekRecords => Set<WeekRecord>();
     public DbSet<ApprovalEvent> ApprovalEvents => Set<ApprovalEvent>();
 
     public DbSet<Notification> Notifications => Set<Notification>();
-
-	public DbSet<Otp> Otps => Set<Otp>();
 
 	protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -45,7 +49,9 @@ public class MeridianDbContext(DbContextOptions<MeridianDbContext> options) : Db
         modelBuilder.ApplyConfiguration(new LocationConfiguration());
         modelBuilder.ApplyConfiguration(new AccountConfiguration());
         modelBuilder.ApplyConfiguration(new ProjectConfiguration());
-        modelBuilder.ApplyConfiguration(new TaskCategoryConfiguration());
+        modelBuilder.ApplyConfiguration(new ProjectTypeConfiguration());
+        modelBuilder.ApplyConfiguration(new ProjectTypeModuleTemplateConfiguration());
+        modelBuilder.ApplyConfiguration(new ProjectTypeTaskTemplateConfiguration());
         modelBuilder.ApplyConfiguration(new ModuleConfiguration());
         modelBuilder.ApplyConfiguration(new WorkTaskConfiguration());
 
@@ -53,17 +59,20 @@ public class MeridianDbContext(DbContextOptions<MeridianDbContext> options) : Db
         modelBuilder.ApplyConfiguration(new RoleConfiguration());
         modelBuilder.ApplyConfiguration(new EmployeeRoleConfiguration());
         modelBuilder.ApplyConfiguration(new EmployeeDepartmentConfiguration());
+        modelBuilder.ApplyConfiguration(new EmployeeProjectAllocationConfiguration());
 
         modelBuilder.ApplyConfiguration(new HolidayConfiguration());
         modelBuilder.ApplyConfiguration(new LeaveRecordConfiguration());
 
         modelBuilder.ApplyConfiguration(new TimeEntryConfiguration());
+        modelBuilder.ApplyConfiguration(new UserStoryConfiguration());
         modelBuilder.ApplyConfiguration(new DayTypeOverrideConfiguration());
         modelBuilder.ApplyConfiguration(new DayTypeRequestConfiguration());
+        modelBuilder.ApplyConfiguration(new ClientWeekOffConfiguration());
+        modelBuilder.ApplyConfiguration(new EmployeeWeekOffConfiguration());
         modelBuilder.ApplyConfiguration(new WeekRecordConfiguration());
         modelBuilder.ApplyConfiguration(new ApprovalEventConfiguration());
 
         modelBuilder.ApplyConfiguration(new NotificationConfiguration());
-		modelBuilder.ApplyConfiguration(new OtpConfiguration());
 	}
 }

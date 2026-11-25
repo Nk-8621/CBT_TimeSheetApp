@@ -49,7 +49,22 @@ public class EmployeesController(IEmployeeService employeeService, IAccessContro
 	[HttpGet("{employeeCode}/access")]
 	public async Task<IActionResult> GetAccess(string employeeCode, CancellationToken ct) =>
 		Ok(await accessControlService.GetAccessProfileAsync(employeeCode, ct));
-	
+
+	/// <summary>Which Projects this employee is currently allocated to — backs
+	/// the pre-ticked checkbox list on the Edit Employee form.</summary>
+	[HttpGet("{employeeCode}/projects")]
+	public async Task<IActionResult> GetProjectAllocations(string employeeCode, CancellationToken ct) =>
+		Ok(await employeeService.GetProjectAllocationsAsync(employeeCode, ct));
+
+	/// <summary>Replaces this employee's full set of project allocations —
+	/// ticked boxes are added, unticked ones are removed. Admin-only.</summary>
+	[HttpPut("{employeeCode}/projects")]
+	public async Task<IActionResult> SetProjectAllocations(string employeeCode, [FromBody] SetEmployeeProjectAllocationsRequest request, CancellationToken ct)
+	{
+		if (!currentUser.IsAdmin) return Forbid();
+		await employeeService.SetProjectAllocationsAsync(employeeCode, request, ct);
+		return NoContent();
+	}
 
 	/// <summary>Creates a new employee (internal or external) and immediately
 /// grants portal access with the default password + forced first-login
@@ -60,6 +75,14 @@ public class EmployeesController(IEmployeeService employeeService, IAccessContro
 		if (!currentUser.IsAdmin) return Forbid();
 		var employee = await employeeService.CreateEmployeeAsync(request, ct);
 		return Ok(employee);
+	}
+
+	/// <summary>Edits name, email, designation, department and manager. Admin-only.</summary>
+	[HttpPut("{employeeCode}")]
+	public async Task<IActionResult> Update(string employeeCode, [FromBody] UpdateEmployeeRequest request, CancellationToken ct)
+	{
+		if (!currentUser.IsAdmin) return Forbid();
+		return Ok(await employeeService.UpdateEmployeeAsync(employeeCode, request, ct));
 	}
 
 	[HttpPut("{employeeCode}/primary-account")]
