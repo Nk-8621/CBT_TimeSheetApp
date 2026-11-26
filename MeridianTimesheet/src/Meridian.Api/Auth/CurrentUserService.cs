@@ -1,23 +1,14 @@
 using Meridian.Application.Interfaces.Repositories;
 using Meridian.Application.Interfaces.Services;
 using Microsoft.AspNetCore.Http;
-using System.Security.Claims;
 
 namespace Meridian.Api.Auth;
 
 /// <summary>
-/// Resolves the calling employee from the current Entra access token's
-/// claims. Fast path: the token's "oid" claim already matches an
-/// Employee.EntraObjectId from a previous sign-in. First-ever sign-in for
-/// an employee: no Employee row has that oid yet, so this falls back to
-/// matching by email/UPN against an existing Employee record (created by
-/// an admin via Master Data) and links that record's EntraObjectId to the
-/// oid for next time (just-in-time linking, not employee creation - a
-/// Microsoft account with no matching Employee record resolves to null
-/// here, which the caller treats as "not a recognized employee").
-/// Admin status is always checked against the database's
-/// Carbynetech_EmployeeRole table, never trusted from claims, since Entra
-/// App Roles aren't configured for this app.
+/// Resolves the calling employee from the "employee_code" claim of the
+/// API's own JWT (issued by AuthController at login). A deactivated
+/// employee resolves to null (-> 401). Admin status is always checked
+/// against the Carbynetech_EmployeeRole table, never trusted from claims.
 /// </summary>
 public class CurrentUserService : ICurrentUserService
 {
@@ -36,38 +27,15 @@ public class CurrentUserService : ICurrentUserService
     private static string? ResolveEmployeeCode(IHttpContextAccessor accessor, IEmployeeRepository employeeRepository)
     {
         var user = accessor.HttpContext?.User;
-        if (user is null) return null;
+        if (user?.Identity?.IsAuthenticated != true) return null;
 
-        var oidClaim = user.FindFirst("oid")?.Value ?? user.FindFirst(
-            "http://schemas.microsoft.com/identity/claims/objectidentifier")?.Value;
-        if (oidClaim is null || !Guid.TryParse(oidClaim, out var oid)) return null;
+        var code = user.FindFirst(LocalAuthOptions.EmployeeCodeClaim)?.Value;
+        if (string.IsNullOrWhiteSpace(code)) return null;
 
-        // Blocking calls are acceptable here — this runs once per request,
-        // early, and keeps ICurrentUserService's synchronous property shape
-        // that controllers/services depend on throughout.
-        // A deactivated employee resolves to null (-> 401, "not a recognized
-        // employee") so deactivation actually removes access, instead of only
-        // changing a label on the Resources tab.
-        var employee = employeeRepository.GetByEntraObjectIdAsync(oid).GetAwaiter().GetResult();
-        if (employee is not null) return employee.IsActive ? employee.EmployeeCode : null;
-
-        // First sign-in for this Entra identity — no Employee row has this
-        // oid yet. Fall back to matching by email/UPN against an existing
-        // Employee record, and link it for next time.
-        var email = user.FindFirst("preferred_username")?.Value
-            ?? user.FindFirst("upn")?.Value
-            ?? user.FindFirst(ClaimTypes.Upn)?.Value
-            ?? user.FindFirst(ClaimTypes.Email)?.Value
-            ?? user.FindFirst("email")?.Value;
-        if (string.IsNullOrWhiteSpace(email)) return null;
-
-        var matchedByEmail = employeeRepository.GetByCodeOrEmailAsync(email).GetAwaiter().GetResult();
-        if (matchedByEmail is null) return null; // No employee record for this Microsoft account - not auto-created.
-        if (!matchedByEmail.IsActive) return null;
-
-        matchedByEmail.EntraObjectId = oid;
-        employeeRepository.SaveChangesAsync().GetAwaiter().GetResult();
-        return matchedByEmail.EmployeeCode;
+        // Blocking call is acceptable - runs once per request and keeps
+        // ICurrentUserService's synchronous property shape.
+        var employee = employeeRepository.GetByCodeAsync(code).GetAwaiter().GetResult();
+        return employee is { IsActive: true } ? employee.EmployeeCode : null;
     }
 
     private bool ResolveIsAdmin(IEmployeeRepository employeeRepository)

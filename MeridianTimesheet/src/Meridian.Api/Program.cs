@@ -6,7 +6,7 @@ using Meridian.Application.Services;
 using Meridian.Infrastructure;
 using Meridian.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.Identity.Web;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -38,12 +38,29 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 
 // ---- Authentication ----
-// Real Microsoft Entra login — validates access tokens issued against the
-// App Registration configured under "AzureAd" in appsettings.json
-// (TenantId/ClientId/Audience). There is no local password login any
-// more — every request must carry a Bearer token issued by Entra.
+// Local admin login (Microsoft Entra sign-in removed). POST /api/auth/login
+// checks the username/password under "LocalAuth" and issues a JWT signed by
+// this API; every other request must carry that token as a Bearer header.
+var localAuth = builder.Configuration.GetSection(LocalAuthOptions.SectionName).Get<LocalAuthOptions>()
+	?? new LocalAuthOptions();
+builder.Services.AddSingleton(localAuth);
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-	.AddMicrosoftIdentityWebApi(builder.Configuration.GetSection("AzureAd"));
+	.AddJwtBearer(options =>
+	{
+		options.MapInboundClaims = false;
+		options.TokenValidationParameters = new TokenValidationParameters
+		{
+			ValidateIssuer = true,
+			ValidIssuer = LocalAuthOptions.Issuer,
+			ValidateAudience = true,
+			ValidAudience = LocalAuthOptions.Audience,
+			ValidateIssuerSigningKey = true,
+			IssuerSigningKey = localAuth.GetSigningKey(),
+			ValidateLifetime = true,
+			ClockSkew = TimeSpan.FromMinutes(1),
+		};
+	});
 
 builder.Services.AddAuthorization();
 
@@ -73,7 +90,7 @@ builder.Services.AddSwaggerGen(options =>
 		Scheme = "Bearer",
 		BearerFormat = "JWT",
 		In = ParameterLocation.Header,
-		Description = "Paste a Bearer token issued by your Entra tenant.",
+		Description = "Paste the token returned by POST /api/auth/login.",
 	});
 	options.AddSecurityRequirement(new OpenApiSecurityRequirement
 	{
