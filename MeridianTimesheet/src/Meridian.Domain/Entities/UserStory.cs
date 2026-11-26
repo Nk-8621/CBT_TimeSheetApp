@@ -23,6 +23,11 @@ public class UserStory
 	public DateTime CreatedAt { get; set; }
 	public DateTime? UpdatedAt { get; set; }
 
+	/// <summary>PROJECT STORIES (Nov 2026): set when the employee picked a story
+	/// name a manager added for the project; null for a name he typed himself.</summary>
+	public int? ProjectStoryNameId { get; set; }
+
 	public Employee? Employee { get; set; }
 	public Project? Project { get; set; }
+	public ProjectStoryName? ProjectStoryName { get; set; }
 }

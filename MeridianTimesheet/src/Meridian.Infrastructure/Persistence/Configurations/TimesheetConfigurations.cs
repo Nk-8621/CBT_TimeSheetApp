@@ -50,6 +50,22 @@ public class UserStoryConfiguration : IEntityTypeConfiguration<UserStory>
 
         builder.HasOne(s => s.Employee).WithMany().HasForeignKey(s => s.EmployeeId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(s => s.Project).WithMany().HasForeignKey(s => s.ProjectId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(s => s.ProjectStoryName).WithMany().HasForeignKey(s => s.ProjectStoryNameId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+/// <summary>PROJECT STORIES (Nov 2026): story names a manager adds for a project.</summary>
+public class ProjectStoryNameConfiguration : IEntityTypeConfiguration<ProjectStoryName>
+{
+    public void Configure(EntityTypeBuilder<ProjectStoryName> builder)
+    {
+        builder.ToTable("Carbynetech_ProjectStoryName");
+        builder.HasKey(n => n.ProjectStoryNameId);
+        builder.Property(n => n.Name).HasMaxLength(200).IsRequired();
+        builder.HasIndex(n => n.ProjectId);
+
+        builder.HasOne(n => n.Project).WithMany().HasForeignKey(n => n.ProjectId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(n => n.CreatedBy).WithMany().HasForeignKey(n => n.CreatedByEmployeeId).OnDelete(DeleteBehavior.Restrict);
     }
 }
 

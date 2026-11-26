@@ -14,7 +14,8 @@ public record ProjectDto(
 	string? CustomerPO, string? Notes, bool NeedsReview,
 	int? ProjectLeadEmployeeId, string? ProjectLeadEmployeeName,
 	int? ProjectManagerEmployeeId, string? ProjectManagerEmployeeName,
-	int? DeliveryHeadEmployeeId, string? DeliveryHeadEmployeeName);
+	int? DeliveryHeadEmployeeId, string? DeliveryHeadEmployeeName,
+	DateOnly? StartDate, DateOnly? EndDate);
 
 public record ModuleDto(int Id, int ProjectId, string Name, int? ProjectTypeId, string? ProjectTypeCode);
 public record WorkTaskDto(int Id, int ModuleId, string Name);
@@ -53,7 +54,8 @@ public record UpdateAccountRequest(int? DepartmentId, string? Name, string? Acco
 public record CreateProjectRequest(
 	int AccountId, string Code, string Name, string DefaultBillable, int? ProjectTypeId,
 	string? ProjectTech = null, string? BillingType = null, string? CustomerPO = null, string? Notes = null,
-	int? ProjectLeadEmployeeId = null, int? ProjectManagerEmployeeId = null, int? DeliveryHeadEmployeeId = null);
+	int? ProjectLeadEmployeeId = null, int? ProjectManagerEmployeeId = null, int? DeliveryHeadEmployeeId = null,
+	DateOnly? StartDate = null, DateOnly? EndDate = null);
 
 /// <summary>ProjectTypeId is retroactive-classification-only - the backend
 /// applies it ONLY when the project currently has no ProjectTypeId (one
@@ -66,7 +68,8 @@ public record UpdateProjectRequest(
 	int? ProjectTypeId = null,
 	string? ProjectTech = null, string? BillingType = null, string? CustomerPO = null, string? Notes = null,
 	bool? NeedsReview = null,
-	int? ProjectLeadEmployeeId = null, int? ProjectManagerEmployeeId = null, int? DeliveryHeadEmployeeId = null);
+	int? ProjectLeadEmployeeId = null, int? ProjectManagerEmployeeId = null, int? DeliveryHeadEmployeeId = null,
+	DateOnly? StartDate = null, DateOnly? EndDate = null, bool ClearEndDate = false);
 
 public record CreateModuleRequest(int ProjectId, string Name, int? ProjectTypeId = null);
 public record UpdateModuleRequest(string? Name, int? ProjectTypeId = null);

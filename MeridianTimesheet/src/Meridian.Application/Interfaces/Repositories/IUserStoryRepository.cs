@@ -13,5 +13,14 @@ public interface IUserStoryRepository
 	/// <summary>Number of tasks (timesheet lines) per story, in any week, for one
 	/// employee's stories. Stories with no tasks are not in the dictionary.</summary>
 	Task<Dictionary<int, int>> GetTaskCountsAsync(int employeeId, CancellationToken ct = default);
+
+	// ---- PROJECT STORIES (Nov 2026): story names a manager adds for a project ----
+	/// <summary>All story names (open and closed) of these projects, CreatedBy loaded.</summary>
+	Task<IReadOnlyList<ProjectStoryName>> GetProjectStoryNamesAsync(IReadOnlyCollection<int> projectIds, CancellationToken ct = default);
+	Task<ProjectStoryName?> GetProjectStoryNameByIdAsync(int projectStoryNameId, CancellationToken ct = default);
+	Task AddProjectStoryNameAsync(ProjectStoryName storyName, CancellationToken ct = default);
+	/// <summary>Number of different employees with a story made from each name.</summary>
+	Task<Dictionary<int, int>> GetProjectStoryNameUsageAsync(IReadOnlyCollection<int> projectStoryNameIds, CancellationToken ct = default);
+
 	Task SaveChangesAsync(CancellationToken ct = default);
 }

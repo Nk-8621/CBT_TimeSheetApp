@@ -12,6 +12,13 @@ public class Project
     /// override it per line.</summary>
     public string DefaultBillable { get; set; } = "Billable";
     public bool IsActive { get; set; } = true;
+
+    /// <summary>PROJECT DATES (Nov 2026): user stories (and so hours) must fall
+    /// inside these dates. Required for new projects; null on older projects
+    /// until HR fills them in. EndDate null = no end yet.</summary>
+    public DateOnly? StartDate { get; set; }
+    public DateOnly? EndDate { get; set; }
+
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
 

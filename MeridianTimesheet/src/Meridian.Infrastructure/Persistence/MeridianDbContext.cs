@@ -34,6 +34,7 @@ public class MeridianDbContext(DbContextOptions<MeridianDbContext> options) : Db
 
     public DbSet<TimeEntry> TimeEntries => Set<TimeEntry>();
     public DbSet<UserStory> UserStories => Set<UserStory>();
+    public DbSet<ProjectStoryName> ProjectStoryNames => Set<ProjectStoryName>();
     public DbSet<DayTypeOverride> DayTypeOverrides => Set<DayTypeOverride>();
     public DbSet<DayTypeRequest> DayTypeRequests => Set<DayTypeRequest>();
     public DbSet<ClientWeekOff> ClientWeekOffs => Set<ClientWeekOff>();

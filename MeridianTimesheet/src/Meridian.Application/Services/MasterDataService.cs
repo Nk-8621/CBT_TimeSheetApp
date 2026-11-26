@@ -331,6 +331,10 @@ public class MasterDataService(IMasterDataRepository repository, ITimeEntryRepos
 			throw new BusinessRuleException("Project name and code are both required.");
 		RequireValidBillingType(request.BillingType);
 		RequireValidDefaultBillable(request.DefaultBillable);
+		// PROJECT DATES (Nov 2026): Start Date required for new projects, End Date optional.
+		if (request.StartDate is null)
+			throw new BusinessRuleException("Enter the project's start date.");
+		CheckProjectDates(request.StartDate, request.EndDate);
 
 		var existingProjects = await repository.GetProjectsAsync(ct);
 		if (existingProjects.Any(p => string.Equals(p.Code, request.Code, StringComparison.OrdinalIgnoreCase)))
@@ -360,6 +364,8 @@ public class MasterDataService(IMasterDataRepository repository, ITimeEntryRepos
 			ProjectLeadEmployeeId = request.ProjectLeadEmployeeId,
 			ProjectManagerEmployeeId = request.ProjectManagerEmployeeId,
 			DeliveryHeadEmployeeId = request.DeliveryHeadEmployeeId,
+			StartDate = request.StartDate,
+			EndDate = request.EndDate,
 		};
 		await repository.AddProjectAsync(project, ct);
 		await repository.SaveChangesAsync(ct); // populates project.ProjectId before a module can reference it
@@ -413,6 +419,11 @@ public class MasterDataService(IMasterDataRepository repository, ITimeEntryRepos
 		if (request.ProjectLeadEmployeeId is int leadId) project.ProjectLeadEmployeeId = leadId;
 		if (request.ProjectManagerEmployeeId is int mgrId) project.ProjectManagerEmployeeId = mgrId;
 		if (request.DeliveryHeadEmployeeId is int dhId) project.DeliveryHeadEmployeeId = dhId;
+		// PROJECT DATES (Nov 2026)
+		if (request.StartDate is DateOnly startDate) project.StartDate = startDate;
+		if (request.EndDate is DateOnly endDate) project.EndDate = endDate;
+		if (request.ClearEndDate) project.EndDate = null;
+		CheckProjectDates(project.StartDate, project.EndDate);
 		project.UpdatedAt = DateTime.UtcNow;
 
 		// Retroactive classification: ONLY takes effect the moment a project
@@ -1005,13 +1016,20 @@ public class MasterDataService(IMasterDataRepository repository, ITimeEntryRepos
 	private static AccountDto ToDto(Account a) => new(a.AccountId, a.DepartmentId, a.Name, a.AccountType.ToString(),
 		WeekOffDays.ToShortNames(WeekOffDays.Parse(a.WeekOffDays)));
 
+	private static void CheckProjectDates(DateOnly? startDate, DateOnly? endDate)
+	{
+		if (startDate is DateOnly start && endDate is DateOnly end && end < start)
+			throw new BusinessRuleException("The project's end date can't be before its start date.");
+	}
+
 	private static ProjectDto ToDto(Project p) => new(
 		p.ProjectId, p.AccountId, p.Code, p.Name, p.DefaultBillable, p.IsActive,
 		p.ProjectTypeId, p.ProjectType?.Name, p.ProjectTech, p.BillingType,
 		p.CustomerPO, p.Notes, p.NeedsReview,
 		p.ProjectLeadEmployeeId, p.ProjectLeadEmployee?.FullName,
 		p.ProjectManagerEmployeeId, p.ProjectManagerEmployee?.FullName,
-		p.DeliveryHeadEmployeeId, p.DeliveryHeadEmployee?.FullName);
+		p.DeliveryHeadEmployeeId, p.DeliveryHeadEmployee?.FullName,
+		p.StartDate, p.EndDate);
 
 	private static ModuleDto ToDto(Module m) => new(m.ModuleId, m.ProjectId, m.Name, m.ProjectTypeId, m.ProjectType?.Code);
 	private static WorkTaskDto ToDto(WorkTask t) => new(t.TaskId, t.ModuleId, t.Name);
