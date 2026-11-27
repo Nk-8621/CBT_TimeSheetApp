@@ -7,7 +7,7 @@ namespace Meridian.Api.Middleware;
 /// Maps Application-layer exceptions to HTTP responses in one place, so
 /// controllers stay free of repetitive try/catch blocks.
 /// </summary>
-public class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<ExceptionHandlingMiddleware> logger)
+public class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<ExceptionHandlingMiddleware> logger, IHostEnvironment environment)
 {
     public async Task InvokeAsync(HttpContext context)
     {
@@ -30,7 +30,13 @@ public class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<Exception
 
             context.Response.ContentType = "application/problem+json";
             context.Response.StatusCode = (int)status;
-            await context.Response.WriteAsJsonAsync(new { status = (int)status, title = message });
+            // In Development only, unexpected errors also send back the real
+            // error (including any inner SQL error) so it can be read in the
+            // browser's Network tab. Production still gets the generic message.
+            var detail = status == HttpStatusCode.InternalServerError && environment.IsDevelopment()
+                ? ex.ToString()
+                : null;
+            await context.Response.WriteAsJsonAsync(new { status = (int)status, title = message, detail });
         }
     }
 }
