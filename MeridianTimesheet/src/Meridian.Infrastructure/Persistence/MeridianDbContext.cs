@@ -67,6 +67,7 @@ public class MeridianDbContext(DbContextOptions<MeridianDbContext> options) : Db
 
         modelBuilder.ApplyConfiguration(new TimeEntryConfiguration());
         modelBuilder.ApplyConfiguration(new UserStoryConfiguration());
+        modelBuilder.ApplyConfiguration(new ProjectStoryNameConfiguration());
         modelBuilder.ApplyConfiguration(new DayTypeOverrideConfiguration());
         modelBuilder.ApplyConfiguration(new DayTypeRequestConfiguration());
         modelBuilder.ApplyConfiguration(new ClientWeekOffConfiguration());
