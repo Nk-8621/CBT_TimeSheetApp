@@ -26,6 +26,10 @@
 --     (they are senior leadership; giving them a manager would make them
 --     start filling timesheets)
 --   * anyone who already reports to CBT1267
+--   * anyone listed in @Exclude below (kept with their current manager -
+--     e.g. people who approve other teams, so their reports' Level 2
+--     does not move to CBT1267). Added 27 Nov 2026: CBT1152 Hamsini,
+--     CBT1128 Aravind, CBT1230 Rajeev.
 --
 -- Select the Carbynetech_Timesheet_App database before running.
 -- =====================================================================
@@ -40,6 +44,13 @@ DECLARE @Projects TABLE (Name NVARCHAR(200) PRIMARY KEY);
 INSERT INTO @Projects (Name) VALUES
     (N'Techeff for Europe - Chevigny'),
     (N'TechEff for India Business');
+
+-- Employees to leave with their current manager (not changed by this script)
+DECLARE @Exclude TABLE (EmployeeCode NVARCHAR(20) PRIMARY KEY);
+INSERT INTO @Exclude (EmployeeCode) VALUES
+    (N'CBT1152'),   -- Hamsini Narayana Murthy (Delivery Manager)
+    (N'CBT1128'),   -- Aravind Chitturi (Senior Talent Manager)
+    (N'CBT1230');   -- Rajeev Gera (has 2 direct reports outside TechEff)
 
 -- ---------------------------------------------------------------------
 -- Checks
@@ -107,6 +118,7 @@ SELECT e.EmployeeId, e.EmployeeCode, e.FullName, e.Designation,
        e.ManagerEmployeeId, m.FullName,
        CASE
            WHEN e.EmployeeId = @ApproverId THEN 'SKIP - this is the approver'
+           WHEN e.EmployeeCode IN (SELECT EmployeeCode FROM @Exclude) THEN 'SKIP - excluded (keeps current manager)'
            WHEN e.EmployeeId IN (SELECT EmployeeId FROM @Above) THEN 'SKIP - above the approver in the reporting line'
            WHEN e.ManagerEmployeeId IS NULL THEN 'SKIP - no manager (senior leadership)'
            WHEN e.Designation LIKE '%Vice President%' OR e.Designation LIKE '%Chief%' THEN 'SKIP - leadership designation'
@@ -120,10 +132,15 @@ LEFT JOIN Carbynetech_Employee m ON m.EmployeeId = e.ManagerEmployeeId
 GROUP BY e.EmployeeId, e.EmployeeCode, e.FullName, e.Designation, e.ManagerEmployeeId, m.FullName;
 
 -- C. What will happen to each employee
-SELECT 'C. Employees' AS Section, EmployeeCode, FullName, Designation, Projects,
-       ISNULL(OldManagerName, '(none)') AS CurrentManager, Action
-FROM @Cand
-ORDER BY CASE WHEN Action LIKE 'CHANGE%' THEN 0 ELSE 1 END, FullName;
+SELECT 'C. Employees' AS Section, c.EmployeeCode, c.FullName, c.Designation, c.Projects,
+       ISNULL(c.OldManagerName, '(none)') AS CurrentManager, c.Action,
+       (SELECT COUNT(*) FROM Carbynetech_Employee r WHERE r.ManagerEmployeeId = c.EmployeeId AND r.IsActive = 1) AS ActiveDirectReports,
+       CASE WHEN c.Action LIKE 'CHANGE%'
+             AND EXISTS (SELECT 1 FROM Carbynetech_Employee r WHERE r.ManagerEmployeeId = c.EmployeeId AND r.IsActive = 1)
+            THEN 'CHECK: has direct reports - their Level 2 would become ' + @ApproverCode + '. Add to @Exclude if not wanted.'
+            ELSE '' END AS Note
+FROM @Cand c
+ORDER BY CASE WHEN c.Action LIKE 'CHANGE%' THEN 0 ELSE 1 END, c.FullName;
 
 -- D. Weeks already waiting for approval - they will move to the new approver's queue
 SELECT 'D. Pending weeks that will be re-routed' AS Section, c.EmployeeCode, c.FullName,
