@@ -9,6 +9,16 @@
     }
   },
   "profiles": {
+    "DryRunTestLogin": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "http://localhost:5160",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "Authentication__DevMode": "true"
+      }
+    },
     "http": {
       "commandName": "Project",
       "dotnetRunMessages": true,

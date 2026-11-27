@@ -5,6 +5,7 @@ using Meridian.Application.Interfaces.Services;
 using Meridian.Application.Services;
 using Meridian.Infrastructure;
 using Meridian.Infrastructure.Repositories;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Identity.Web;
 using Microsoft.OpenApi.Models;
@@ -42,8 +43,31 @@ builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 // App Registration configured under "AzureAd" in appsettings.json
 // (TenantId/ClientId/Audience). There is no local password login any
 // more — every request must carry a Bearer token issued by Entra.
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-	.AddMicrosoftIdentityWebApi(builder.Configuration.GetSection("AzureAd"));
+//
+// DRY-RUN TEST LOGIN (branch dryrun-test-login): a header-based sign-in by
+// employee code is added ONLY when running locally in Development with
+// Authentication:DevMode = true (launch profile "DryRunTestLogin"). On the
+// live site (Production) this block is skipped and only Entra is accepted.
+// See Auth/DevLoginAuthenticationHandler.cs.
+var devLoginRequested = builder.Configuration.GetValue<bool>(DevLoginAuthenticationHandler.ConfigKey);
+var devLoginEnabled = devLoginRequested && builder.Environment.IsDevelopment();
+
+var authBuilder = builder.Services.AddAuthentication(
+	devLoginEnabled ? DevLoginAuthenticationHandler.PolicySchemeName : JwtBearerDefaults.AuthenticationScheme);
+authBuilder.AddMicrosoftIdentityWebApi(builder.Configuration.GetSection("AzureAd"));
+
+if (devLoginEnabled)
+{
+	authBuilder.AddScheme<AuthenticationSchemeOptions, DevLoginAuthenticationHandler>(
+		DevLoginAuthenticationHandler.SchemeName, _ => { });
+	authBuilder.AddPolicyScheme(DevLoginAuthenticationHandler.PolicySchemeName, "Dev login or Entra", options =>
+	{
+		options.ForwardDefaultSelector = context =>
+			context.Request.Headers.ContainsKey(DevLoginAuthenticationHandler.HeaderName)
+				? DevLoginAuthenticationHandler.SchemeName
+				: JwtBearerDefaults.AuthenticationScheme;
+	});
+}
 
 builder.Services.AddAuthorization();
 
@@ -85,6 +109,11 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 var app = builder.Build();
+
+if (devLoginEnabled)
+	app.Logger.LogWarning("DRY-RUN TEST LOGIN IS ENABLED: requests from localhost may sign in with the {Header} header. Never use this on the live site.", DevLoginAuthenticationHandler.HeaderName);
+else if (devLoginRequested)
+	app.Logger.LogWarning("{Key} is true but the environment is {Env}, not Development - dev login stays OFF.", DevLoginAuthenticationHandler.ConfigKey, app.Environment.EnvironmentName);
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 

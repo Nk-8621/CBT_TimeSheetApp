@@ -38,6 +38,17 @@ public class CurrentUserService : ICurrentUserService
         var user = accessor.HttpContext?.User;
         if (user is null) return null;
 
+        // DRY-RUN TEST LOGIN only: this identity type is created solely by
+        // DevLoginAuthenticationHandler, which is registered only for local
+        // Development runs with Authentication:DevMode = true (see Program.cs).
+        if (user.Identity?.AuthenticationType == DevLoginAuthenticationHandler.SchemeName)
+        {
+            var devCode = user.FindFirst(DevLoginAuthenticationHandler.EmployeeCodeClaim)?.Value;
+            if (string.IsNullOrWhiteSpace(devCode)) return null;
+            var devEmployee = employeeRepository.GetByCodeAsync(devCode).GetAwaiter().GetResult();
+            return devEmployee is { IsActive: true } ? devEmployee.EmployeeCode : null;
+        }
+
         var oidClaim = user.FindFirst("oid")?.Value ?? user.FindFirst(
             "http://schemas.microsoft.com/identity/claims/objectidentifier")?.Value;
         if (oidClaim is null || !Guid.TryParse(oidClaim, out var oid)) return null;
